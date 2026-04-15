@@ -1,0 +1,18 @@
+# Root
+node_modules/
+.env
+.env.local
+.env.*.local
+*.log
+
+# SQLite local DB
+*.db
+*.db-journal
+dev.db
+
+# Uploads
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
