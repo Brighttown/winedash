@@ -1,9 +1,6 @@
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
 import { z } from 'zod';
 import { asyncHandler } from '../utils/asyncHandler.js';
-
-const prisma = new PrismaClient();
+import prisma from '../utils/prisma.js';
 
 const catalogSchema = z.object({
     name: z.string().min(1).max(200),

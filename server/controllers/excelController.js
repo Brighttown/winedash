@@ -5,11 +5,8 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const XLSX = require('xlsx');
 
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
 import { TYPE_MAP } from '../utils/wineTypes.js';
-
-const prisma = new PrismaClient();
+import prisma from '../utils/prisma.js';
 
 const ALLOWED_EXCEL_EXT = new Set(['.xlsx', '.xls', '.csv']);
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB

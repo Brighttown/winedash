@@ -1,10 +1,7 @@
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-
-const prisma = new PrismaClient();
+import prisma from '../utils/prisma.js';
 const JWT_SECRET = process.env.JWT_SECRET;
 
 const registerSchema = z.object({

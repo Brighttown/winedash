@@ -1,7 +1,5 @@
 import Fuse from 'fuse.js';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-const prisma = new PrismaClient();
+import prisma from './prisma.js';
 
 const MATCH_THRESHOLD = 0.45;   // Fuse score ≤ this = automatisch gekoppeld (0=perfect, 1=slecht)
 const MAX_CANDIDATES = 5;

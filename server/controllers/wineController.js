@@ -1,10 +1,7 @@
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
 import { z } from 'zod';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { TYPE_MAP } from '../utils/wineTypes.js';
-
-const prisma = new PrismaClient();
+import prisma from '../utils/prisma.js';
 
 const wineSchema = z.object({
     name: z.string().min(1).max(200),

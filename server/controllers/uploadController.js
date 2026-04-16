@@ -3,13 +3,14 @@ import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
 import Tesseract from 'tesseract.js';
-import puppeteer from 'puppeteer';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-const prisma = new PrismaClient();
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
+import prisma from '../utils/prisma.js';
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'application/pdf']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const MIN_TEXT_LENGTH = 100;
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -32,7 +33,6 @@ export const uploadConfig = multer({
 });
 
 export const processInvoiceUpload = async (req, res) => {
-    let browser;
     try {
         if (!req.file) return res.status(400).json({ error: 'Geen bestand geüpload' });
 
@@ -40,14 +40,18 @@ export const processInvoiceUpload = async (req, res) => {
         let text = '';
 
         if (ext === '.pdf') {
-            browser = await puppeteer.launch({ headless: 'new' });
-            const page = await browser.newPage();
-            const absolutePath = path.resolve(req.file.path);
-            await page.goto(`file://${absolutePath}`, { waitUntil: 'networkidle0' });
-            await page.setViewport({ width: 2000, height: 2800, deviceScaleFactor: 2 });
-            const screenshotBuffer = await page.screenshot({ fullPage: true });
-            const { data } = await Tesseract.recognize(screenshotBuffer, 'nld+eng');
-            text = data.text;
+            try {
+                const buffer = await fs.readFile(req.file.path);
+                const parsed = await pdfParse(buffer);
+                text = (parsed.text || '').trim();
+                if (text.length < MIN_TEXT_LENGTH) {
+                    const { data } = await Tesseract.recognize(buffer, 'nld+eng');
+                    text = data.text;
+                }
+            } catch {
+                const { data } = await Tesseract.recognize(req.file.path, 'nld+eng');
+                text = data.text;
+            }
         } else {
             const { data } = await Tesseract.recognize(req.file.path, 'nld+eng');
             text = data.text;
@@ -96,9 +100,7 @@ export const processInvoiceUpload = async (req, res) => {
             }
         }
 
-        // Cleanup uploaded file
         await fs.unlink(req.file.path).catch(() => {});
-        if (browser) await browser.close();
 
         res.json({
             success: true,
@@ -108,7 +110,6 @@ export const processInvoiceUpload = async (req, res) => {
         });
 
     } catch (error) {
-        if (browser) await browser.close();
         if (req.file) await fs.unlink(req.file.path).catch(() => {});
         console.error('Invoice Upload Error:', error);
         res.status(500).json({ error: 'Fout bij verwerking van het bestand. Probeer het opnieuw.' });

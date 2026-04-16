@@ -2,16 +2,12 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ocrInvoiceFile } from '../utils/ocr.js';
 import { extractInvoice, suggestWineMetadata } from '../utils/llmClient.js';
 import { matchLines } from '../utils/catalogMatcher.js';
 import { TYPE_MAP } from '../utils/wineTypes.js';
-
-const prisma = new PrismaClient();
+import prisma from '../utils/prisma.js';
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'application/pdf']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
