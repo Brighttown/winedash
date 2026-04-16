@@ -95,6 +95,9 @@ const InvoiceImportPage = () => {
     const updateNewCatalog = (i, patch) => {
         setRows(rs => rs.map((r, idx) => idx === i ? { ...r, newCatalog: { ...r.newCatalog, ...patch } } : r));
     };
+    const removeRow = (i) => {
+        setRows(rs => rs.filter((_, idx) => idx !== i));
+    };
 
     // ─── AI suggestion on-demand ──────────────────────────────────────────────
     const handleSuggest = async (i) => {
@@ -295,6 +298,13 @@ const InvoiceImportPage = () => {
                                                 )}
                                                 <p className="font-bold text-slate-800">{row.name}</p>
                                                 {row.producer && <span className="text-xs text-slate-500">· {row.producer}</span>}
+                                                <button
+                                                    onClick={() => removeRow(i)}
+                                                    className="ml-auto text-slate-300 hover:text-red-500 transition-colors"
+                                                    title="Verwijder regel"
+                                                >
+                                                    <X size={16} />
+                                                </button>
                                             </div>
 
                                             {isMatched && (
@@ -339,11 +349,11 @@ const InvoiceImportPage = () => {
 
                                             {/* New-catalog fields (editable when action === create-catalog) */}
                                             {row.action === 'create-catalog' && (
-                                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+                                                <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
                                                     <InputField label="Type" value={row.newCatalog.type} onChange={v => updateNewCatalog(i, { type: v })} type="select" options={TYPE_OPTIONS} />
                                                     <InputField label="Regio" value={row.newCatalog.region} onChange={v => updateNewCatalog(i, { region: v })} />
                                                     <InputField label="Land" value={row.newCatalog.country} onChange={v => updateNewCatalog(i, { country: v })} />
-                                                    <InputField label="Druif" value={row.newCatalog.grape} onChange={v => updateNewCatalog(i, { grape: v })} />
+                                                    <InputField label="Druif" value={row.newCatalog.grape} onChange={v => updateNewCatalog(i, { grape: v })} className="md:col-span-2" />
                                                     <InputField label="Producent" value={row.newCatalog.winery} onChange={v => updateNewCatalog(i, { winery: v })} />
                                                 </div>
                                             )}
@@ -426,8 +436,8 @@ const InvoiceImportPage = () => {
     );
 };
 
-const InputField = ({ label, value, onChange, type = 'text', step, options }) => (
-    <div>
+const InputField = ({ label, value, onChange, type = 'text', step, options, className }) => (
+    <div className={className}>
         <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</label>
         {type === 'select' ? (
             <select

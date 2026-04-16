@@ -17,7 +17,7 @@ const AddToStockModal = ({ wine, isOpen, onClose, onSuccess }) => {
     useEffect(() => {
         if (wine) {
             setFormData({
-                vintage: wine.vintage || new Date().getFullYear(),
+                vintage: wine.vintage || '',
                 supplier: 'Geïmporteerd uit Database',
                 purchase_price: 0,
                 sell_price: 0,

@@ -41,7 +41,7 @@ app.use(helmet());
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 const allowedOrigins = process.env.CLIENT_URL
     ? process.env.CLIENT_URL.split(',').map(o => o.trim())
-    : ['http://localhost:5173'];
+    : ['http://localhost:5173', 'http://localhost:5174'];
 
 app.use(cors({
     origin: (origin, callback) => {

@@ -32,7 +32,7 @@ const INVOICE_TOOL = {
                     properties: {
                         name:        { type: 'string',  description: 'Naam van de wijn (zonder jaar/prijs/hoeveelheid)' },
                         producer:    { type: 'string',  description: 'Producent/wijnhuis/château indien bekend' },
-                        vintage:     { type: 'integer', description: 'Oogstjaar (bv. 2020), alleen als zeker' },
+                        vintage:     { type: 'integer', description: 'Oogstjaar (bv. 2020) — ALLEEN invullen als het jaartal expliciet in de tekst staat. Laat leeg als het ontbreekt.' },
                         quantity:    { type: 'integer', description: 'Aantal flessen — gebruik 1 als niet vermeld' },
                         unit_price:  { type: 'number',  description: 'Prijs per fles (EUR)' },
                         total_price: { type: 'number',  description: 'Totaalprijs voor deze regel (EUR)' },
@@ -86,7 +86,8 @@ export async function extractInvoice(ocrText) {
                     'Hieronder staat tekst van een wijnfactuur of wijnkaart (deel ' + (i + 1) + ' van ' + chunks.length + '). ' +
                     'De tekst kan font-encoding fouten bevatten waarbij letters verkeerd zijn weergegeven (bv. "C" i.p.v. "L", "J" i.p.v. "L", "|" i.p.v. "l"). ' +
                     'Gebruik je kennis van wijnamen, producenten en regio\'s om dergelijke fouten te corrigeren in de output. ' +
-                    'Extraheer ELKE wijnregel: naam, producent, jaar, hoeveelheid en prijs. ' +
+                    'Extraheer ELKE wijnregel: naam, producent, hoeveelheid en prijs. ' +
+                    'Vul het oogstjaar ALLEEN in als het expliciet vermeld staat in de tekst (bv. "Château X 2019" → vintage 2019). Laat vintage leeg als het ontbreekt. ' +
                     'Negeer kopteksten, categorie-labels, BTW-regels en tekst die geen echte wijn is. ' +
                     'Als het type niet zeker is, leid het af uit de sectie-header (bv. "Vins Rouges" → red).\n\n' +
                     '--- TEKST ---\n' + chunk
@@ -140,10 +141,21 @@ const SUGGEST_TOOL = {
         type: 'object',
         properties: {
             type:       { type: 'string', enum: ['red', 'white', 'rose', 'sparkling', 'dessert'] },
-            region:     { type: 'string', description: 'Regio (bv. Bourgogne, Rioja)' },
-            country:    { type: 'string', description: 'Land (bv. Frankrijk, Spanje)' },
-            grape:      { type: 'string', description: 'Druivenras(sen)' },
-            winery:     { type: 'string', description: 'Wijnhuis/producent' },
+            region:     { type: 'string', description: 'Specifieke wijnregio (bv. Bourgogne, Rioja, Toscane, Wachau). Nooit het land zelf invullen als regio.' },
+            country:    {
+                type: 'string',
+                enum: [
+                    'Frankrijk', 'Italië', 'Spanje', 'Portugal', 'Duitsland', 'Oostenrijk',
+                    'Zwitserland', 'Griekenland', 'Hongarije', 'Roemenië', 'Bulgarije',
+                    'Slovenië', 'Kroatië', 'Servië', 'Georgië', 'Moldavië',
+                    'Verenigde Staten', 'Canada', 'Argentinië', 'Chili', 'Uruguay', 'Brazilië',
+                    'Zuid-Afrika', 'Australië', 'Nieuw-Zeeland', 'Israël', 'Libanon',
+                    'Marokko', 'Japan', 'China'
+                ],
+                description: 'Land van herkomst — kies exact uit de lijst'
+            },
+            grape:      { type: 'string', description: 'Druivenras(sen) als kommalijst indien meerdere (bv. "Cabernet Sauvignon, Merlot")' },
+            winery:     { type: 'string', description: 'Wijnhuis/producent — laat leeg als onbekend, gebruik NOOIT "<UNKNOWN>" of placeholders' },
             confidence: { type: 'string', enum: ['low', 'medium', 'high'] }
         },
         required: ['type']
@@ -158,6 +170,9 @@ export async function suggestWineMetadata({ name, vintage, producer }) {
         vintage  ? `Jaar: ${vintage}`       : null,
         '',
         'Stel op basis van deze gegevens de best passende catalogus-metadata voor. ' +
+        'Vermeld bij grape ALLE bekende druivenrassen als kommalijst (bv. "Grenache, Syrah, Mourvèdre"). ' +
+        'Vul bij regio ALLEEN een specifieke wijnregio in (bv. Wachau, Kamptal, Toscane) — nooit het land zelf. ' +
+        'Laat winery leeg als de producent onbekend is; gebruik nooit placeholders zoals "<UNKNOWN>". ' +
         'Als je het niet zeker weet, geef dan de meest waarschijnlijke waarde en zet confidence op "low".'
     ].filter(Boolean).join('\n');
 
