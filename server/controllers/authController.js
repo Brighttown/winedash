@@ -2,26 +2,41 @@ import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretwinedashkey';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+const registerSchema = z.object({
+    username: z.string().min(3).max(50),
+    email: z.string().email(),
+    password: z.string().min(8),
+    name: z.string().max(100).optional(),
+    companyName: z.string().max(100).optional(),
+});
+
+const loginSchema = z.object({
+    username: z.string().min(1),
+    password: z.string().min(1),
+});
 
 export const register = async (req, res) => {
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.errors[0].message });
+    }
+
+    const { username, email, password, name, companyName } = parsed.data;
+
     try {
-        const { username, email, password, name, companyName } = req.body;
-
-        if (!username) return res.status(400).json({ error: 'Gebruikersnaam is verplicht.' });
-
-        // Check if username or email already exists
         const existingUser = await prisma.user.findUnique({ where: { username } });
         if (existingUser) return res.status(400).json({ error: 'Gebruikersnaam is al in gebruik.' });
 
         const existingEmail = await prisma.user.findUnique({ where: { email } });
         if (existingEmail) return res.status(400).json({ error: 'E-mailadres is al in gebruik.' });
 
-        const password_hash = await bcrypt.hash(password, 10);
+        const password_hash = await bcrypt.hash(password, 12);
 
-        // First registered user becomes admin automatically
         const userCount = await prisma.user.count();
         const role = userCount === 0 ? 'admin' : 'user';
 
@@ -54,14 +69,19 @@ export const register = async (req, res) => {
         });
     } catch (error) {
         console.error('Register error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Registratie mislukt. Probeer het opnieuw.' });
     }
 };
 
 export const login = async (req, res) => {
-    try {
-        const { username, password } = req.body;
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({ error: 'Gebruikersnaam en wachtwoord zijn verplicht.' });
+    }
 
+    const { username, password } = parsed.data;
+
+    try {
         const user = await prisma.user.findUnique({
             where: { username },
             include: { companies: true }
@@ -85,6 +105,6 @@ export const login = async (req, res) => {
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Inloggen mislukt. Probeer het opnieuw.' });
     }
 };

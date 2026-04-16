@@ -57,6 +57,7 @@ export const getDashboardStats = async (req, res) => {
             topMarginWines
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Dashboard error:', error);
+        res.status(500).json({ error: 'Fout bij ophalen van dashboard-gegevens.' });
     }
 };

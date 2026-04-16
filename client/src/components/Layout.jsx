@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Wine, Upload, LogOut, Database, FileSpreadsheet, Users, ShieldCheck, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, Wine, Upload, LogOut, Database, FileSpreadsheet, Users, ShieldCheck, CheckSquare, Sparkles } from 'lucide-react';
 
 const Layout = () => {
     const navigate = useNavigate();
@@ -71,6 +71,9 @@ const Layout = () => {
                                 </NavLink>
                                 <NavLink to="/upload" className={navClass}>
                                     <Upload size={20} className="mr-3" /> Facturen
+                                </NavLink>
+                                <NavLink to="/invoice-import" className={navClass}>
+                                    <Sparkles size={20} className="mr-3" /> Factuur AI
                                 </NavLink>
                                 <NavLink to="/excel-import" className={navClass}>
                                     <FileSpreadsheet size={20} className="mr-3" /> Excel Import

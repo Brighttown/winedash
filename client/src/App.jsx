@@ -6,6 +6,7 @@ import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Wines from './pages/Wines';
 import UploadPage from './pages/UploadPage';
+import InvoiceImportPage from './pages/InvoiceImportPage';
 import Catalog from './pages/Catalog';
 import CatalogDetail from './pages/CatalogDetail';
 import ExcelImport from './pages/ExcelImport';
@@ -40,6 +41,7 @@ function App() {
           {/* User routes */}
           <Route path="wines" element={<Wines />} />
           <Route path="upload" element={<UploadPage />} />
+          <Route path="invoice-import" element={<InvoiceImportPage />} />
           <Route path="excel-import" element={<ExcelImport />} />
           {/* Admin routes */}
           <Route path="admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />

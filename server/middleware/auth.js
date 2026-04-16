@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretwinedashkey';
+// JWT_SECRET must be set; server.js already enforces this at startup.
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export const requireAuth = (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -15,7 +16,7 @@ export const requireAuth = (req, res, next) => {
         const payload = jwt.verify(token, JWT_SECRET);
         req.user = payload;
         next();
-    } catch (err) {
+    } catch {
         return res.status(401).json({ error: 'Ongeldig of verlopen token' });
     }
 };
@@ -26,4 +27,3 @@ export const requireAdmin = (req, res, next) => {
     }
     next();
 };
-

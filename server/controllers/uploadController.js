@@ -1,17 +1,20 @@
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
+import fs from 'fs/promises';
+import { existsSync, mkdirSync } from 'fs';
 import Tesseract from 'tesseract.js';
 import puppeteer from 'puppeteer';
 import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
 
-// Setup multer for uploads
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = 'uploads';
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+        if (!existsSync(dir)) mkdirSync(dir);
         cb(null, dir);
     },
     filename: (req, file, cb) => {
@@ -21,13 +24,10 @@ const storage = multer.diskStorage({
 
 export const uploadConfig = multer({
     storage,
+    limits: { fileSize: MAX_FILE_SIZE },
     fileFilter: (req, file, cb) => {
-        const filetypes = /jpeg|jpg|png|pdf/;
-        const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-
-        if (mimetype && extname) return cb(null, true);
-        cb(new Error("Alleen afbeeldingsbestanden en PDF's zijn toegestaan"));
+        if (ALLOWED_MIME.has(file.mimetype)) return cb(null, true);
+        cb(new Error("Alleen afbeeldingsbestanden (JPG, PNG) en PDF's zijn toegestaan"));
     }
 });
 
@@ -40,30 +40,23 @@ export const processInvoiceUpload = async (req, res) => {
         let text = '';
 
         if (ext === '.pdf') {
-            // Use Puppeteer to "see" the PDF (works for both text and scans)
             browser = await puppeteer.launch({ headless: 'new' });
             const page = await browser.newPage();
             const absolutePath = path.resolve(req.file.path);
             await page.goto(`file://${absolutePath}`, { waitUntil: 'networkidle0' });
-
-            // Set scale for better OCR
             await page.setViewport({ width: 2000, height: 2800, deviceScaleFactor: 2 });
-
-            // Capture the whole page as an image
             const screenshotBuffer = await page.screenshot({ fullPage: true });
             const { data } = await Tesseract.recognize(screenshotBuffer, 'nld+eng');
             text = data.text;
         } else {
-            // Direct OCR on image
             const { data } = await Tesseract.recognize(req.file.path, 'nld+eng');
             text = data.text;
         }
 
-        // HEURISTIC PARSING
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 5);
         const extractedWines = [];
 
-        for (let line of lines) {
+        for (const line of lines) {
             const yearMatch = line.match(/(20[12]\d)/);
             const vintage = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
 
@@ -73,10 +66,14 @@ export const processInvoiceUpload = async (req, res) => {
             const quantityMatch = line.match(/\b(\d{1,3})\s*[xX]/) || line.match(/^[0-9]{1,3}\b/);
             const quantity = quantityMatch ? parseInt(quantityMatch[1] || quantityMatch[0]) : 1;
 
-            let cleanName = line.replace(/20[12]\d/g, '').replace(/\d+[.,]\d{2}/g, '').replace(/\b\d{1,3}\s*[xX]/g, '').replace(/[€$]/g, '').trim();
+            let cleanName = line
+                .replace(/20[12]\d/g, '')
+                .replace(/\d+[.,]\d{2}/g, '')
+                .replace(/\b\d{1,3}\s*[xX]/g, '')
+                .replace(/[€$]/g, '')
+                .trim();
 
             if (cleanName.length > 3 && price > 0) {
-                // TRY TO FIND A MATCH IN CATALOG
                 const possibilities = await prisma.wineCatalog.findMany({
                     where: {
                         OR: [
@@ -92,28 +89,28 @@ export const processInvoiceUpload = async (req, res) => {
                     vintage,
                     quantity,
                     purchase_price: price,
-                    sell_price: price * 2.5,
+                    sell_price: parseFloat((price * 2.5).toFixed(2)),
                     matchFound: possibilities.length > 0 ? possibilities[0] : null,
                     allMatches: possibilities
                 });
             }
         }
 
-        // CLEANUP
-        if (req.file) fs.unlink(req.file.path, () => { });
+        // Cleanup uploaded file
+        await fs.unlink(req.file.path).catch(() => {});
         if (browser) await browser.close();
 
         res.json({
             success: true,
             extractedWines: extractedWines.length > 0 ? extractedWines : [
-                { name: "Onbekende Wijn (Pas aan)", vintage: new Date().getFullYear(), quantity: 1, purchase_price: 0, sell_price: 0, matchFound: null, allMatches: [] }
+                { name: 'Onbekende Wijn (Pas aan)', vintage: new Date().getFullYear(), quantity: 1, purchase_price: 0, sell_price: 0, matchFound: null, allMatches: [] }
             ]
         });
 
     } catch (error) {
         if (browser) await browser.close();
+        if (req.file) await fs.unlink(req.file.path).catch(() => {});
         console.error('Invoice Upload Error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: 'Fout bij verwerking van het bestand. Probeer het opnieuw.' });
     }
 };
-

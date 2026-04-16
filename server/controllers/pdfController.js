@@ -93,6 +93,6 @@ export const generateWineList = async (req, res) => {
     res.send(pdfBuffer);
   } catch (error) {
     console.error('PDF Gen Error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'PDF genereren mislukt. Probeer het opnieuw.' });
   }
 };
