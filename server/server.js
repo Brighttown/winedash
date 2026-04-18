@@ -14,6 +14,7 @@ import invoiceRoutes from './routes/invoice.js';
 import catalogRoutes from './routes/catalog.js';
 import excelImportRoutes from './routes/excelImport.js';
 import adminRoutes from './routes/admin.js';
+import stockMovementsRoutes from './routes/stockMovements.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -84,6 +85,7 @@ app.use('/api/invoice', uploadLimiter, invoiceRoutes);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/excel', excelImportRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/wines/:wineId/movements', stockMovementsRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {

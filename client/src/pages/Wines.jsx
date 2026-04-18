@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-hot-toast';
-import { Plus, Search, Edit2, Trash2, FileDown, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, FileDown, X, ClipboardList } from 'lucide-react';
+import StockMutationsModal from '../components/StockMutationsModal';
 
 const Wines = () => {
     const [wines, setWines] = useState([]);
@@ -9,8 +10,11 @@ const Wines = () => {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
 
-    // Modal state
+    // Wine edit modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    // Mutations modal state
+    const [mutationsWine, setMutationsWine] = useState(null);
     const [formData, setFormData] = useState({
         name: '', region: '', country: '', vintage: '', grape: '', type: 'red',
         supplier: '', purchase_price: 0, sell_price: 0, stock_count: 0, min_stock_alert: 0
@@ -181,8 +185,9 @@ const Wines = () => {
                                         <td className="p-4 text-slate-600 font-medium">€{wine.purchase_price?.toFixed(2)}</td>
                                         <td className="p-4 font-bold text-[#0D2B4E]">€{wine.sell_price?.toFixed(2)}</td>
                                         <td className="p-4 text-right opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={() => openEditModal(wine)} className="p-2 text-slate-400 hover:text-[#4A9FD4] transition-colors"><Edit2 size={16} /></button>
-                                            <button onClick={() => handleDelete(wine.id)} className="p-2 text-slate-400 hover:text-red-500 transition-colors ml-1"><Trash2 size={16} /></button>
+                                            <button onClick={() => setMutationsWine(wine)} title="Voorraadmutaties" className="p-2 text-slate-400 hover:text-[#4A9FD4] transition-colors"><ClipboardList size={16} /></button>
+                                            <button onClick={() => openEditModal(wine)} title="Bewerken" className="p-2 text-slate-400 hover:text-[#4A9FD4] transition-colors ml-1"><Edit2 size={16} /></button>
+                                            <button onClick={() => handleDelete(wine.id)} title="Verwijderen" className="p-2 text-slate-400 hover:text-red-500 transition-colors ml-1"><Trash2 size={16} /></button>
                                         </td>
                                     </tr>
                                 ))}
@@ -194,6 +199,14 @@ const Wines = () => {
                     )}
                 </div>
             </div>
+
+            {mutationsWine && (
+                <StockMutationsModal
+                    wine={mutationsWine}
+                    onClose={() => setMutationsWine(null)}
+                    onStockChanged={fetchWines}
+                />
+            )}
 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-[#0f172a]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
