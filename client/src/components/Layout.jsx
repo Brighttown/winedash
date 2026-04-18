@@ -40,17 +40,18 @@ const Layout = () => {
     return (
         <div className="flex min-h-screen relative" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
 
-            {/* ── Volledige app achtergrond: vineyard afbeelding ── */}
+            {/* ── Volledige app achtergrond: vineyard afbeelding met blur ── */}
             <div
-                className="fixed inset-0 -z-10"
+                className="fixed inset-0 -z-10 scale-110"
                 style={{
                     backgroundImage: "url('/vineyard.avif')",
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
+                    filter: 'blur(50px)',
                 }}
             />
-            {/* Lichte donkering over de hele app voor leesbaarheid */}
-            <div className="fixed inset-0 -z-10 bg-black/25" />
+            {/* 30% zwart overlay over de hele app */}
+            <div className="fixed inset-0 -z-10 bg-black/30" />
 
             {/* ── Sidebar (desktop) ── */}
             <div className="hidden md:flex w-64 flex-col relative shadow-2xl overflow-hidden">
