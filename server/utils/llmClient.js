@@ -58,6 +58,7 @@ const INVOICE_TOOL = {
  */
 export async function extractInvoice(ocrText) {
     if (!ocrText || ocrText.trim().length < 10) {
+        console.warn('[llm] extractInvoice: OCR tekst te kort of leeg, geen extractie mogelijk');
         return { supplier: '', lines: [] };
     }
 
@@ -98,7 +99,10 @@ export async function extractInvoice(ocrText) {
 
         const toolUse = response.content.find(b => b.type === 'tool_use');
         console.log(`[llm] Chunk ${i + 1}: stop_reason=${response.stop_reason}, tool_use=${!!toolUse}, regels=${toolUse?.input?.lines?.length ?? 0}`);
-        if (!toolUse) continue;
+        if (!toolUse) {
+            console.warn(`[llm] Chunk ${i + 1}: geen tool_use ontvangen. Volledige response content:`, JSON.stringify(response.content));
+            continue;
+        }
 
         if (i === 0 && toolUse.input.supplier) supplier = toolUse.input.supplier;
         if (i === 0 && toolUse.input.invoice_date) invoice_date = toolUse.input.invoice_date;
@@ -115,6 +119,7 @@ export async function extractInvoice(ocrText) {
         if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 1500));
     }
 
+    console.log(`[llm] Extractie klaar: ${allLines.length} unieke wijnen gevonden`);
     return { supplier, invoice_date, lines: allLines };
 }
 

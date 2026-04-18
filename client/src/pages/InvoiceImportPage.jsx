@@ -74,7 +74,6 @@ const InvoiceImportPage = () => {
                 overrides: {
                     quantity: line.quantity || 1,
                     purchase_price: line.unit_price || 0,
-                    sell_price: '',
                     vintage: line.vintage || '',
                     non_vintage: !line.vintage
                 },
@@ -372,7 +371,7 @@ const InvoiceImportPage = () => {
                                             )}
 
                                             {/* Always-editable stock fields */}
-                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                                 <InputField label="Aantal" value={row.overrides.quantity} onChange={v => updateOverride(i, { quantity: +v })} type="number" />
                                                 <div>
                                                     <InputField
@@ -395,7 +394,6 @@ const InvoiceImportPage = () => {
                                                 </div>
                                                 <InputField label="Flesgrootte" value={row.newCatalog.bottle_size} onChange={v => updateNewCatalog(i, { bottle_size: v })} />
                                                 <InputField label="Inkoop (€)" value={row.overrides.purchase_price} onChange={v => updateOverride(i, { purchase_price: +v })} type="number" step="0.01" />
-                                                <InputField label="Verkoop (€)" value={row.overrides.sell_price} onChange={v => updateOverride(i, { sell_price: v })} type="number" step="0.01" placeholder="variabel" />
                                             </div>
                                         </div>
                                     </div>
