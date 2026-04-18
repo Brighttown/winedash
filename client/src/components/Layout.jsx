@@ -38,22 +38,35 @@ const Layout = () => {
     );
 
     return (
-        <div className="flex min-h-screen" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+        <div className="flex min-h-screen relative" style={{ fontFamily: "'Inria Sans', sans-serif" }}>
+
+            {/* ── Volledige app achtergrond: vineyard afbeelding ── */}
+            <div
+                className="fixed inset-0 -z-10"
+                style={{
+                    backgroundImage: "url('/vineyard.avif')",
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                }}
+            />
+            {/* Lichte donkering over de hele app voor leesbaarheid */}
+            <div className="fixed inset-0 -z-10 bg-black/25" />
 
             {/* ── Sidebar (desktop) ── */}
             <div className="hidden md:flex w-64 flex-col relative shadow-2xl overflow-hidden">
 
-                {/* Vineyard achtergrond */}
+                {/* Sidebar: zelfde vineyard + extra blur + extra zwart overlay */}
                 <div
-                    className="absolute inset-0"
+                    className="absolute inset-0 scale-110"
                     style={{
                         backgroundImage: "url('/vineyard.avif')",
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
+                        filter: 'blur(18px)',
                     }}
                 />
-                {/* Zwart overlay 30% (basis) + extra 30% = 60% totaal */}
-                <div className="absolute inset-0 bg-black/60" />
+                {/* Extra zwart overlay bovenop: 70% totaal */}
+                <div className="absolute inset-0 bg-black/70" />
 
                 {/* Inhoud boven de overlays */}
                 <div className="relative z-10 flex flex-col h-full">
@@ -159,7 +172,7 @@ const Layout = () => {
             </div>
 
             {/* ── Hoofdinhoud ── */}
-            <div className="flex-1 flex flex-col overflow-hidden bg-[#F2F7F4]">
+            <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Mobile header */}
                 <header className="md:hidden flex items-center justify-between px-4 py-3 shadow-lg relative overflow-hidden">
                     <div className="absolute inset-0" style={{ backgroundImage: "url('/vineyard.avif')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
