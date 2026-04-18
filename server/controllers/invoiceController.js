@@ -129,10 +129,8 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
             const sellPrice = decision.wineOverrides?.sell_price != null && decision.wineOverrides.sell_price !== ''
                 ? Number(decision.wineOverrides.sell_price)
                 : null;
-            const vintage = Number(decision.wineOverrides?.vintage ?? line.vintage);
-            if (!vintage || Number.isNaN(vintage)) {
-                throw new Error(`Jaartal ontbreekt voor "${line.name}"`);
-            }
+            const rawVintage = decision.wineOverrides?.vintage ?? line.vintage;
+            const vintage = rawVintage ? Number(rawVintage) : null;
 
             // Resolve catalog entry (either existing or newly created)
             let catalog = null;
@@ -224,7 +222,7 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
         }
 
         return { createdCatalog, createdWines, updatedWines, movements };
-    });
+    }, { timeout: 60000 });
 
     res.json({ success: true, ...result });
 });

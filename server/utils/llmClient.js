@@ -180,15 +180,28 @@ export async function suggestWineMetadata({ name, vintage, producer }) {
         'Als je het niet zeker weet, geef dan de meest waarschijnlijke waarde en zet confidence op "low".'
     ].filter(Boolean).join('\n');
 
-    const response = await client.messages.create({
-        model: MODEL,
-        max_tokens: 500,
-        tools: [SUGGEST_TOOL],
-        tool_choice: { type: 'tool', name: 'suggest_wine_metadata' },
-        messages: [{ role: 'user', content: prompt }]
-    });
-
-    const toolUse = response.content.find(b => b.type === 'tool_use');
-    if (!toolUse) return { type: 'red', confidence: 'low' };
-    return toolUse.input;
+    const MAX_RETRIES = 2;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const response = await client.messages.create({
+                model: MODEL,
+                max_tokens: 500,
+                tools: [SUGGEST_TOOL],
+                tool_choice: { type: 'tool', name: 'suggest_wine_metadata' },
+                messages: [{ role: 'user', content: prompt }]
+            });
+            const toolUse = response.content.find(b => b.type === 'tool_use');
+            if (!toolUse) return { type: 'red', confidence: 'low' };
+            return toolUse.input;
+        } catch (err) {
+            if (err.status === 429 && attempt < MAX_RETRIES) {
+                const retryAfter = err.headers?.['retry-after'];
+                const waitMs = retryAfter ? (parseInt(retryAfter, 10) + 2) * 1000 : 15000;
+                console.log(`[llm] Rate limit (429), wachten ${waitMs}ms voor retry ${attempt + 1}/${MAX_RETRIES}...`);
+                await new Promise(r => setTimeout(r, waitMs));
+                continue;
+            }
+            throw err;
+        }
+    }
 }

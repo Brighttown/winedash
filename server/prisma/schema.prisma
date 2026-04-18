@@ -38,7 +38,7 @@ model Wine {
   region           String
   subregion        String?
   country          String
-  vintage          Int
+  vintage          Int?
   grape            String
   type             String   // red/white/rose/sparkling
   bottle_size      String?

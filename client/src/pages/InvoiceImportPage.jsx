@@ -4,7 +4,7 @@ import api from '../api/axios';
 import { toast } from 'react-hot-toast';
 import {
     UploadCloud, CheckCircle, AlertTriangle, Sparkles, Search,
-    X, Save, Plus, FileText, Trash2
+    X, Save, Plus, FileText, Trash2, Loader2
 } from 'lucide-react';
 
 const TYPE_OPTIONS = [
@@ -75,7 +75,8 @@ const InvoiceImportPage = () => {
                     quantity: line.quantity || 1,
                     purchase_price: line.unit_price || 0,
                     sell_price: '',
-                    vintage: line.vintage || ''
+                    vintage: line.vintage || '',
+                    non_vintage: !line.vintage
                 },
                 suggesting: false
             })));
@@ -161,10 +162,10 @@ const InvoiceImportPage = () => {
     const handleConfirm = async () => {
         if (!session) return;
 
-        // Validate: every selected row needs a vintage
-        const missingVintage = rows.findIndex(r => r.selected && !r.overrides.vintage);
+        // Validate: every selected row needs a vintage (unless NV)
+        const missingVintage = rows.findIndex(r => r.selected && !r.overrides.non_vintage && !r.overrides.vintage);
         if (missingVintage !== -1) {
-            toast.error(`Vul een jaartal in voor "${rows[missingVintage].name}"`);
+            toast.error(`Vul een jaartal in voor "${rows[missingVintage].name}" (of vink NV aan)`);
             return;
         }
 
@@ -281,10 +282,16 @@ const InvoiceImportPage = () => {
                             return (
                                 <div
                                     key={i}
-                                    className={`bg-white rounded-xl border-l-4 shadow-sm p-4 ${
-                                        color === 'green' ? 'border-green-500' : 'border-amber-500'
+                                    className={`relative rounded-xl border-l-4 shadow-sm p-4 ${
+                                        color === 'green' ? 'border-green-500 bg-green-50' : 'border-amber-500 bg-white'
                                     } ${!row.selected ? 'opacity-50' : ''}`}
                                 >
+                                    {row.suggesting && (
+                                        <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center z-10">
+                                            <Loader2 size={24} className="animate-spin text-purple-600" />
+                                            <span className="ml-2 text-sm font-medium text-purple-700">AI bezig...</span>
+                                        </div>
+                                    )}
                                     <div className="flex items-start gap-3">
                                         <input
                                             type="checkbox"
@@ -358,7 +365,25 @@ const InvoiceImportPage = () => {
                                             {/* Always-editable stock fields */}
                                             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                                                 <InputField label="Aantal" value={row.overrides.quantity} onChange={v => updateOverride(i, { quantity: +v })} type="number" />
-                                                <InputField label="Jaar" value={row.overrides.vintage} onChange={v => updateOverride(i, { vintage: +v })} type="number" />
+                                                <div>
+                                                    <InputField
+                                                        label="Jaar"
+                                                        value={row.overrides.non_vintage ? '' : row.overrides.vintage}
+                                                        onChange={v => updateOverride(i, { vintage: v })}
+                                                        type="number"
+                                                        disabled={row.overrides.non_vintage}
+                                                        placeholder={row.overrides.non_vintage ? 'NV' : ''}
+                                                    />
+                                                    <label className="flex items-center gap-1 mt-1 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!row.overrides.non_vintage}
+                                                            onChange={e => updateOverride(i, { non_vintage: e.target.checked, vintage: e.target.checked ? '' : row.overrides.vintage })}
+                                                            className="w-3 h-3"
+                                                        />
+                                                        <span className="text-[10px] text-slate-500 uppercase tracking-wide">NV</span>
+                                                    </label>
+                                                </div>
                                                 <InputField label="Flesgrootte" value={row.newCatalog.bottle_size} onChange={v => updateNewCatalog(i, { bottle_size: v })} />
                                                 <InputField label="Inkoop (€)" value={row.overrides.purchase_price} onChange={v => updateOverride(i, { purchase_price: +v })} type="number" step="0.01" />
                                                 <InputField label="Verkoop (€)" value={row.overrides.sell_price} onChange={v => updateOverride(i, { sell_price: v })} type="number" step="0.01" placeholder="variabel" />
@@ -446,14 +471,15 @@ const InvoiceImportPage = () => {
     );
 };
 
-const InputField = ({ label, value, onChange, type = 'text', step, options, className, placeholder }) => (
+const InputField = ({ label, value, onChange, type = 'text', step, options, className, placeholder, disabled }) => (
     <div className={className}>
         <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</label>
         {type === 'select' ? (
             <select
                 value={value}
                 onChange={e => onChange(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded"
+                disabled={disabled}
+                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded disabled:bg-slate-100 disabled:text-slate-400"
             >
                 {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
@@ -464,7 +490,8 @@ const InputField = ({ label, value, onChange, type = 'text', step, options, clas
                 value={value}
                 onChange={e => onChange(e.target.value)}
                 placeholder={placeholder}
-                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded"
+                disabled={disabled}
+                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded disabled:bg-slate-100 disabled:text-slate-400"
             />
         )}
     </div>
