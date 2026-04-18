@@ -126,9 +126,9 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
             if (quantity <= 0) continue;
 
             const purchasePrice = Number(decision.wineOverrides?.purchase_price ?? line.unit_price) || 0;
-            const sellPrice = Number(
-                decision.wineOverrides?.sell_price ?? (purchasePrice ? +(purchasePrice * 2.5).toFixed(2) : 0)
-            );
+            const sellPrice = decision.wineOverrides?.sell_price != null && decision.wineOverrides.sell_price !== ''
+                ? Number(decision.wineOverrides.sell_price)
+                : null;
             const vintage = Number(decision.wineOverrides?.vintage ?? line.vintage);
             if (!vintage || Number.isNaN(vintage)) {
                 throw new Error(`Jaartal ontbreekt voor "${line.name}"`);
@@ -151,9 +151,11 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                         name: String(nc.name || line.name).trim(),
                         type,
                         region: String(nc.region || 'Onbekend').trim(),
+                        subregion: nc.subregion ? String(nc.subregion).trim() : null,
                         country: String(nc.country || 'Onbekend').trim(),
                         vintage: nc.vintage ? Number(nc.vintage) : (vintage || null),
                         grape: nc.grape ? String(nc.grape).trim() : null,
+                        bottle_size: nc.bottle_size ? String(nc.bottle_size).trim() : (line.bottle_size || null),
                         winery: nc.winery ? String(nc.winery).trim() : (line.producer || null),
                         is_verified: false
                     }
@@ -164,8 +166,10 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
             const wineName = String(decision.wineOverrides?.name ?? catalog?.name ?? line.name).trim();
             const wineType = catalog?.type || TYPE_MAP[String(line.type_hint || '').toLowerCase()] || 'red';
             const wineRegion = catalog?.region || 'Onbekend';
+            const wineSubregion = catalog?.subregion || null;
             const wineCountry = catalog?.country || 'Onbekend';
             const wineGrape = catalog?.grape || '';
+            const wineBottleSize = catalog?.bottle_size || line.bottle_size || null;
 
             // Check for existing stock entry (same company + name + vintage)
             const existing = await tx.wine.findFirst({
@@ -191,9 +195,11 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                         name: wineName,
                         type: wineType,
                         region: wineRegion,
+                        subregion: wineSubregion,
                         country: wineCountry,
                         vintage,
                         grape: wineGrape,
+                        bottle_size: wineBottleSize,
                         supplier: supplierName,
                         purchase_price: purchasePrice,
                         sell_price: sellPrice,

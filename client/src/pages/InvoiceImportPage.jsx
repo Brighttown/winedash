@@ -65,14 +65,16 @@ const InvoiceImportPage = () => {
                     name: line.name || '',
                     type: line.type_hint && line.type_hint !== 'unknown' ? line.type_hint : 'red',
                     region: '',
+                    subregion: '',
                     country: '',
                     grape: '',
-                    winery: line.producer || ''
+                    winery: line.producer || '',
+                    bottle_size: line.bottle_size || ''
                 },
                 overrides: {
                     quantity: line.quantity || 1,
                     purchase_price: line.unit_price || 0,
-                    sell_price: line.unit_price ? +(line.unit_price * 2.5).toFixed(2) : 0,
+                    sell_price: '',
                     vintage: line.vintage || ''
                 },
                 suggesting: false
@@ -113,6 +115,7 @@ const InvoiceImportPage = () => {
             updateNewCatalog(i, {
                 type: data.type || rows[i].newCatalog.type,
                 region: data.region || '',
+                subregion: data.subregion || '',
                 country: data.country || '',
                 grape: data.grape || '',
                 winery: data.winery || rows[i].newCatalog.winery
@@ -349,9 +352,10 @@ const InvoiceImportPage = () => {
 
                                             {/* New-catalog fields (editable when action === create-catalog) */}
                                             {row.action === 'create-catalog' && (
-                                                <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
+                                                <div className="grid grid-cols-2 md:grid-cols-7 gap-2 mb-3">
                                                     <InputField label="Type" value={row.newCatalog.type} onChange={v => updateNewCatalog(i, { type: v })} type="select" options={TYPE_OPTIONS} />
                                                     <InputField label="Regio" value={row.newCatalog.region} onChange={v => updateNewCatalog(i, { region: v })} />
+                                                    <InputField label="Streek" value={row.newCatalog.subregion} onChange={v => updateNewCatalog(i, { subregion: v })} />
                                                     <InputField label="Land" value={row.newCatalog.country} onChange={v => updateNewCatalog(i, { country: v })} />
                                                     <InputField label="Druif" value={row.newCatalog.grape} onChange={v => updateNewCatalog(i, { grape: v })} className="md:col-span-2" />
                                                     <InputField label="Producent" value={row.newCatalog.winery} onChange={v => updateNewCatalog(i, { winery: v })} />
@@ -359,11 +363,12 @@ const InvoiceImportPage = () => {
                                             )}
 
                                             {/* Always-editable stock fields */}
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                                                 <InputField label="Aantal" value={row.overrides.quantity} onChange={v => updateOverride(i, { quantity: +v })} type="number" />
                                                 <InputField label="Jaar" value={row.overrides.vintage} onChange={v => updateOverride(i, { vintage: +v })} type="number" />
+                                                <InputField label="Flesgrootte" value={row.newCatalog.bottle_size} onChange={v => updateNewCatalog(i, { bottle_size: v })} />
                                                 <InputField label="Inkoop (€)" value={row.overrides.purchase_price} onChange={v => updateOverride(i, { purchase_price: +v })} type="number" step="0.01" />
-                                                <InputField label="Verkoop (€)" value={row.overrides.sell_price} onChange={v => updateOverride(i, { sell_price: +v })} type="number" step="0.01" />
+                                                <InputField label="Verkoop (€)" value={row.overrides.sell_price} onChange={v => updateOverride(i, { sell_price: v })} type="number" step="0.01" placeholder="variabel" />
                                             </div>
                                         </div>
                                     </div>
@@ -436,7 +441,7 @@ const InvoiceImportPage = () => {
     );
 };
 
-const InputField = ({ label, value, onChange, type = 'text', step, options, className }) => (
+const InputField = ({ label, value, onChange, type = 'text', step, options, className, placeholder }) => (
     <div className={className}>
         <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</label>
         {type === 'select' ? (
@@ -453,6 +458,7 @@ const InputField = ({ label, value, onChange, type = 'text', step, options, clas
                 step={step}
                 value={value}
                 onChange={e => onChange(e.target.value)}
+                placeholder={placeholder}
                 className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded"
             />
         )}

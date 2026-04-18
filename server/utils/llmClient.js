@@ -30,12 +30,13 @@ const INVOICE_TOOL = {
                 items: {
                     type: 'object',
                     properties: {
-                        name:        { type: 'string',  description: 'Naam van de wijn (zonder jaar/prijs/hoeveelheid)' },
+                        name:        { type: 'string',  description: 'Naam van de wijn (zonder jaar/prijs/hoeveelheid/flesformaat)' },
                         producer:    { type: 'string',  description: 'Producent/wijnhuis/château indien bekend' },
                         vintage:     { type: 'integer', description: 'Oogstjaar (bv. 2020) — ALLEEN invullen als het jaartal expliciet in de tekst staat. Laat leeg als het ontbreekt.' },
                         quantity:    { type: 'integer', description: 'Aantal flessen — gebruik 1 als niet vermeld' },
                         unit_price:  { type: 'number',  description: 'Prijs per fles (EUR)' },
                         total_price: { type: 'number',  description: 'Totaalprijs voor deze regel (EUR)' },
+                        bottle_size: { type: 'string',  description: 'Flesformaat als leesbare tekst. Leid af uit de eenheid: FLES→"750ml", MAGN/Magnum→"Magnum (1.5L)", DEMI/HALF→"375ml", MAG3L/Jeroboam→"Jeroboam (3L)". Laat leeg als onbekend.' },
                         type_hint: {
                             type: 'string',
                             enum: ['red', 'white', 'rose', 'sparkling', 'dessert', 'unknown'],
@@ -143,7 +144,8 @@ const SUGGEST_TOOL = {
         type: 'object',
         properties: {
             type:       { type: 'string', enum: ['red', 'white', 'rose', 'sparkling', 'dessert'] },
-            region:     { type: 'string', description: 'Specifieke wijnregio (bv. Bourgogne, Rioja, Toscane, Wachau). Nooit het land zelf invullen als regio.' },
+            region:     { type: 'string', description: 'Grote wijnregio (bv. Bourgogne, Bordeaux, Rioja, Toscane, Wachau). Nooit het land zelf invullen als regio.' },
+            subregion:  { type: 'string', description: 'Specifieke streek of appellation binnen de regio (bv. Pauillac, Côte de Nuits, Rioja Alta, Chianti Classico, Pouilly-Fumé). Laat leeg als niet van toepassing.' },
             country:    {
                 type: 'string',
                 enum: [

@@ -36,13 +36,15 @@ model Wine {
   id               String   @id @default(uuid())
   name             String
   region           String
+  subregion        String?
   country          String
   vintage          Int
   grape            String
   type             String   // red/white/rose/sparkling
+  bottle_size      String?
   supplier         String?
   purchase_price   Float
-  sell_price       Float
+  sell_price       Float?
   stock_count      Int      @default(0)
   min_stock_alert  Int      @default(0)
   days_in_stock    Int      @default(0)
@@ -67,12 +69,14 @@ model WineCatalog {
   id               String   @id @default(uuid())
   name             String   @unique
   region           String
+  subregion        String?
   country          String
   vintage          Int?
   grape            String?
   type             String
+  bottle_size      String?
   image_url        String?
-  
+
   // Detailed information
   elaborate        String?
   harmonize        String?
