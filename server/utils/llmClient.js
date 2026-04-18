@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 const MODEL = 'claude-haiku-4-5-20251001';
-const CHUNK_SIZE = 3000;   // tekens per LLM-call
-const MAX_OUTPUT = 1200;   // ruim genoeg voor ~12 wijnregels per chunk
+const CHUNK_SIZE = 6000;   // tekens per LLM-call (groot genoeg voor een 4-pagina's factuur in één chunk)
+const MAX_OUTPUT = 4096;   // ~150 tokens/regel × 26 regels + overhead
 const MAX_CHUNKS = 10;     // cap op aantal chunks (~30 wijnen voor een factuur; grote kaarten worden afgekapt)
 
 let _client = null;
@@ -67,6 +67,7 @@ export async function extractInvoice(ocrText) {
         console.log(`[llm] Document afgekapt: ${allChunks.length} chunks → ${MAX_CHUNKS} (rate limit)`);
     }
     console.log(`[llm] Verwerken in ${chunks.length} chunk(s), totaal ${ocrText.length} tekens`);
+    chunks.forEach((c, i) => console.log(`[llm] Chunk ${i + 1}: ${c.length} tekens`));
 
     let supplier = '';
     let invoice_date = null;
@@ -95,6 +96,7 @@ export async function extractInvoice(ocrText) {
         });
 
         const toolUse = response.content.find(b => b.type === 'tool_use');
+        console.log(`[llm] Chunk ${i + 1}: stop_reason=${response.stop_reason}, tool_use=${!!toolUse}, regels=${toolUse?.input?.lines?.length ?? 0}`);
         if (!toolUse) continue;
 
         if (i === 0 && toolUse.input.supplier) supplier = toolUse.input.supplier;
