@@ -278,7 +278,8 @@ const InvoiceImportPage = () => {
                     <div className="space-y-3 mb-6">
                         {rows.map((row, i) => {
                             const isMatched = row.action === 'link-existing' && row.match?.matched;
-                            const color = isMatched ? 'green' : 'amber';
+                            const catalogReady = row.action === 'create-catalog' && row.newCatalog.region && row.newCatalog.country;
+                            const color = (isMatched || catalogReady) ? 'green' : 'amber';
                             return (
                                 <div
                                     key={i}
@@ -334,7 +335,7 @@ const InvoiceImportPage = () => {
                                                 </div>
                                             )}
 
-                                            {!isMatched && (
+                                            {!isMatched && !catalogReady && (
                                                 <div className="text-xs bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
                                                     <p className="text-amber-800 mb-2">
                                                         Geen automatische match gevonden met voorraad
@@ -352,6 +353,13 @@ const InvoiceImportPage = () => {
 
                                             {/* New-catalog fields (editable when action === create-catalog) */}
                                             {row.action === 'create-catalog' && (
+                                                <>
+                                                {catalogReady && (
+                                                    <div className="text-xs text-green-700 bg-green-100 border border-green-200 rounded px-3 py-1.5 mb-2 flex items-center justify-between">
+                                                        <span>Nieuwe catalogus-entry aanmaken</span>
+                                                        <button onClick={() => openSearch(i)} className="underline text-green-800 hover:text-green-900 ml-2">Zoek bestaande</button>
+                                                    </div>
+                                                )}
                                                 <div className="grid grid-cols-2 md:grid-cols-7 gap-2 mb-3">
                                                     <InputField label="Type" value={row.newCatalog.type} onChange={v => updateNewCatalog(i, { type: v })} type="select" options={TYPE_OPTIONS} />
                                                     <InputField label="Regio" value={row.newCatalog.region} onChange={v => updateNewCatalog(i, { region: v })} />
@@ -360,6 +368,7 @@ const InvoiceImportPage = () => {
                                                     <InputField label="Druif" value={row.newCatalog.grape} onChange={v => updateNewCatalog(i, { grape: v })} className="md:col-span-2" />
                                                     <InputField label="Producent" value={row.newCatalog.winery} onChange={v => updateNewCatalog(i, { winery: v })} />
                                                 </div>
+                                                </>
                                             )}
 
                                             {/* Always-editable stock fields */}
