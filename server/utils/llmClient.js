@@ -34,8 +34,8 @@ const INVOICE_TOOL = {
                         producer:    { type: 'string',  description: 'Producent/wijnhuis/château indien bekend' },
                         vintage:     { type: 'integer', description: 'Oogstjaar (bv. 2020) — ALLEEN invullen als het jaartal expliciet in de tekst staat. Laat leeg als het ontbreekt.' },
                         quantity:    { type: 'integer', description: 'Aantal flessen — gebruik 1 als niet vermeld' },
-                        unit_price:  { type: 'number',  description: 'Netto inkoopprijs per fles (EUR) — gebruik de kolom "Netto" of "Netto prijs", NIET de lijstprijs/stukprijs vóór korting.' },
-                        total_price: { type: 'number',  description: 'Totaalbedrag voor deze regel (EUR) — gebruik de kolom "Bedrag" of "Totaal".' },
+                        unit_price:  { type: 'number',  description: 'Netto inkoopprijs per fles (EUR). Bereken als: Bedrag / Aantal. NIET de lijstprijs/stukprijs vóór korting.' },
+                        total_price: { type: 'number',  description: 'Totaalbedrag voor deze regel (EUR) — de kolom "Bedrag" op de factuur.' },
                         bottle_size: { type: 'string',  description: 'Flesformaat als leesbare tekst. Leid af uit de eenheid: FLES→"750ml", MAGN/Magnum→"Magnum (1.5L)", DEMI/HALF→"375ml", MAG3L/Jeroboam→"Jeroboam (3L)". Laat leeg als onbekend.' },
                         type_hint: {
                             type: 'string',
