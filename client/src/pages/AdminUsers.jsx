@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-hot-toast';
-import { Users, ShieldCheck, User, Trash2 } from 'lucide-react';
+import { Users, ShieldCheck, User } from 'lucide-react';
 
 const AdminUsers = () => {
     const [users, setUsers] = useState([]);
@@ -34,15 +34,15 @@ const AdminUsers = () => {
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex items-center space-x-3">
-                <div className="bg-amber-100 p-3 rounded-2xl text-amber-700"><Users size={30} /></div>
+                <div className="bg-white/10 p-3 rounded-2xl text-white"><Users size={30} /></div>
                 <div>
-                    <h1 className="text-3xl font-black text-slate-800">Gebruikersbeheer</h1>
-                    <p className="text-slate-500">Bekijk en beheer alle geregistreerde gebruikers.</p>
+                    <h1 className="text-3xl font-bold text-white">Gebruikersbeheer</h1>
+                    <p className="text-white/50">Bekijk en beheer alle geregistreerde gebruikers.</p>
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_auto] px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 bg-slate-50">
+            <div className="glass rounded-2xl shadow-xl overflow-hidden">
+                <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_auto] px-5 py-3 text-xs font-bold uppercase tracking-wider text-white/30 border-b border-white/10 bg-white/5">
                     <span>Gebruiker</span>
                     <span>Gebruikersnaam</span>
                     <span>Rol</span>
@@ -51,19 +51,19 @@ const AdminUsers = () => {
 
                 {loading ? (
                     <div className="flex items-center justify-center py-16">
-                        <div className="w-8 h-8 border-4 border-[#4A9FD4] border-t-transparent rounded-full animate-spin" />
+                        <div className="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin" />
                     </div>
                 ) : (
-                    <div className="divide-y divide-slate-100">
+                    <div className="divide-y divide-white/10">
                         {users.map(u => (
-                            <div key={u.id} className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_auto] items-center px-5 py-4 hover:bg-slate-50 transition-colors">
+                            <div key={u.id} className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_auto] items-center px-5 py-4 hover:bg-white/5 transition-colors">
                                 <div>
-                                    <p className="font-bold text-slate-800">{u.name}</p>
-                                    <p className="text-xs text-slate-400">{u.email}</p>
+                                    <p className="font-bold text-white">{u.name}</p>
+                                    <p className="text-xs text-white/30">{u.email}</p>
                                 </div>
-                                <div className="text-sm text-slate-600 font-mono">@{u.username}</div>
+                                <div className="text-sm text-white/50 font-mono">@{u.username}</div>
                                 <div>
-                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg ${u.role === 'admin' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg border ${u.role === 'admin' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-white/10 text-white/50 border-white/10'}`}>
                                         {u.role === 'admin' ? <ShieldCheck size={12} /> : <User size={12} />}
                                         {u.role === 'admin' ? 'Admin' : 'Gebruiker'}
                                     </span>
@@ -71,7 +71,7 @@ const AdminUsers = () => {
                                 <div>
                                     <button
                                         onClick={() => toggleRole(u.id, u.role)}
-                                        className="text-sm font-semibold text-[#4A9FD4] hover:text-[#0D2B4E] transition-colors"
+                                        className="text-sm font-semibold text-[#C4758A] hover:text-white transition-colors"
                                     >
                                         {u.role === 'admin' ? 'Maak gebruiker' : 'Maak admin'}
                                     </button>

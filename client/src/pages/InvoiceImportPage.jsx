@@ -2,18 +2,27 @@ import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import api from '../api/axios';
 import { toast } from 'react-hot-toast';
-import {
-    UploadCloud, CheckCircle, AlertTriangle, Sparkles, Search,
-    X, Save, Plus, FileText, Trash2, Loader2
-} from 'lucide-react';
+import { UploadCloud, CheckCircle, AlertTriangle, Sparkles, Search, X, Save, Plus, FileText, Trash2, Loader2 } from 'lucide-react';
 
 const TYPE_OPTIONS = [
-    { value: 'red', label: 'Rood' },
-    { value: 'white', label: 'Wit' },
-    { value: 'rose', label: 'Rosé' },
-    { value: 'sparkling', label: 'Bruisend' },
+    { value: 'red', label: 'Rood' }, { value: 'white', label: 'Wit' },
+    { value: 'rose', label: 'Rosé' }, { value: 'sparkling', label: 'Bruisend' },
     { value: 'dessert', label: 'Dessert' }
 ];
+
+const InputField = ({ label, value, onChange, type = 'text', step, options, className, placeholder, disabled }) => (
+    <div className={className}>
+        <label className="block text-[10px] font-semibold text-white/40 uppercase tracking-wide mb-1">{label}</label>
+        {type === 'select' ? (
+            <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled} className="select-glass py-1.5 text-sm disabled:opacity-40">
+                {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+        ) : (
+            <input type={type} step={step} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled}
+                className="input-glass py-1.5 px-2 text-sm disabled:opacity-40" />
+        )}
+    </div>
+);
 
 const InvoiceImportPage = () => {
     const [file, setFile] = useState(null);
@@ -22,106 +31,56 @@ const InvoiceImportPage = () => {
     const [supplier, setSupplier] = useState('');
     const [rows, setRows] = useState([]);
     const [saving, setSaving] = useState(false);
-
-    // modal state for catalog search on amber rows
     const [searchingIndex, setSearchingIndex] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
 
     const onDrop = useCallback(accepted => {
-        if (accepted?.length > 0) {
-            setFile(accepted[0]);
-            setSession(null);
-            setRows([]);
-        }
+        if (accepted?.length > 0) { setFile(accepted[0]); setSession(null); setRows([]); }
     }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: { 'image/*': ['.jpeg', '.jpg', '.png'], 'application/pdf': ['.pdf'] },
-        maxFiles: 1
+        onDrop, accept: { 'image/*': ['.jpeg', '.jpg', '.png'], 'application/pdf': ['.pdf'] }, maxFiles: 1
     });
 
-    // ─── Step 1: extract ──────────────────────────────────────────────────────
     const handleExtract = async () => {
         if (!file) return;
         setLoading(true);
         const toastId = toast.loading('Factuur scannen… (kan 1-2 min duren bij grote PDF)', { duration: Infinity });
         const formData = new FormData();
         formData.append('file', file);
-
         try {
-            const { data } = await api.post('/invoice/extract', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-                timeout: 180000  // 3 minuten
-            });
+            const { data } = await api.post('/invoice/extract', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 180000 });
             setSession({ sessionId: data.sessionId });
             setSupplier(data.supplier || '');
             setRows(data.lines.map(line => ({
                 ...line,
-                action: line.match?.fromInventory && line.match?.matched
-                    ? 'update-stock'
-                    : line.match?.matched ? 'link-existing' : 'create-catalog',
+                action: line.match?.fromInventory && line.match?.matched ? 'update-stock' : line.match?.matched ? 'link-existing' : 'create-catalog',
                 selected: true,
-                newCatalog: {
-                    name: line.name || '',
-                    type: line.type_hint && line.type_hint !== 'unknown' ? line.type_hint : 'red',
-                    region: '',
-                    subregion: '',
-                    country: '',
-                    grape: '',
-                    winery: line.producer || '',
-                    bottle_size: line.bottle_size || ''
-                },
-                overrides: {
-                    quantity: line.quantity || 1,
-                    purchase_price: line.unit_price || 0,
-                    vintage: line.vintage || '',
-                    non_vintage: !line.vintage
-                },
+                newCatalog: { name: line.name || '', type: line.type_hint && line.type_hint !== 'unknown' ? line.type_hint : 'red', region: '', subregion: '', country: '', grape: '', winery: line.producer || '', bottle_size: line.bottle_size || '' },
+                overrides: { quantity: line.quantity || 1, purchase_price: line.unit_price || 0, vintage: line.vintage || '', non_vintage: !line.vintage },
                 suggesting: false
             })));
             toast.success(`Factuur uitgelezen: ${data.lines.length} regels`, { id: toastId });
         } catch (err) {
-            const msg = err.response?.data?.error || 'Fout bij verwerken factuur.';
-            toast.error(msg, { id: toastId });
+            toast.error(err.response?.data?.error || 'Fout bij verwerken factuur.', { id: toastId });
         } finally {
             setLoading(false);
         }
     };
 
-    const updateRow = (i, patch) => {
-        setRows(rs => rs.map((r, idx) => idx === i ? { ...r, ...patch } : r));
-    };
-    const updateOverride = (i, patch) => {
-        setRows(rs => rs.map((r, idx) => idx === i ? { ...r, overrides: { ...r.overrides, ...patch } } : r));
-    };
-    const updateNewCatalog = (i, patch) => {
-        setRows(rs => rs.map((r, idx) => idx === i ? { ...r, newCatalog: { ...r.newCatalog, ...patch } } : r));
-    };
-    const removeRow = (i) => {
-        setRows(rs => rs.filter((_, idx) => idx !== i));
-    };
+    const updateRow = (i, patch) => setRows(rs => rs.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+    const updateOverride = (i, patch) => setRows(rs => rs.map((r, idx) => idx === i ? { ...r, overrides: { ...r.overrides, ...patch } } : r));
+    const updateNewCatalog = (i, patch) => setRows(rs => rs.map((r, idx) => idx === i ? { ...r, newCatalog: { ...r.newCatalog, ...patch } } : r));
+    const removeRow = (i) => setRows(rs => rs.filter((_, idx) => idx !== i));
 
-    // ─── AI suggestion on-demand ──────────────────────────────────────────────
     const handleSuggest = async (i) => {
         const row = rows[i];
         if (!row) return;
         updateRow(i, { suggesting: true });
         try {
-            const { data } = await api.post('/invoice/suggest', {
-                name: row.name,
-                vintage: row.vintage,
-                producer: row.producer
-            });
-            updateNewCatalog(i, {
-                type: data.type || rows[i].newCatalog.type,
-                region: data.region || '',
-                subregion: data.subregion || '',
-                country: data.country || '',
-                grape: data.grape || '',
-                winery: data.winery || rows[i].newCatalog.winery
-            });
+            const { data } = await api.post('/invoice/suggest', { name: row.name, vintage: row.vintage, producer: row.producer });
+            updateNewCatalog(i, { type: data.type || rows[i].newCatalog.type, region: data.region || '', subregion: data.subregion || '', country: data.country || '', grape: data.grape || '', winery: data.winery || rows[i].newCatalog.winery });
             toast.success(`AI-suggestie ingevuld (${data.confidence || 'n/b'})`);
         } catch (err) {
             toast.error(err.response?.data?.error || 'AI-suggestie mislukt.');
@@ -130,95 +89,27 @@ const InvoiceImportPage = () => {
         }
     };
 
-    // ─── Catalog search modal ─────────────────────────────────────────────────
-    const openSearch = (i) => {
-        setSearchingIndex(i);
-        setSearchQuery(rows[i].name || '');
-        setSearchResults([]);
-        if (rows[i].name) runSearch(rows[i].name);
-    };
+    const openSearch = (i) => { setSearchingIndex(i); setSearchQuery(rows[i].name || ''); setSearchResults([]); if (rows[i].name) runSearch(rows[i].name); };
+    const runSearch = async (q) => { setSearchQuery(q); if (q.length < 2) { setSearchResults([]); return; } try { const { data } = await api.get(`/catalog?search=${encodeURIComponent(q)}`); setSearchResults(data); } catch (err) {} };
+    const pickCatalog = (catalog) => { if (searchingIndex == null) return; setRows(rs => rs.map((r, idx) => idx === searchingIndex ? { ...r, action: 'link-existing', match: { ...(r.match || {}), matched: catalog } } : r)); setSearchingIndex(null); };
 
-    const runSearch = async (q) => {
-        setSearchQuery(q);
-        if (q.length < 2) { setSearchResults([]); return; }
-        try {
-            const { data } = await api.get(`/catalog?search=${encodeURIComponent(q)}`);
-            setSearchResults(data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    const pickCatalog = (catalog) => {
-        if (searchingIndex == null) return;
-        setRows(rs => rs.map((r, idx) => idx === searchingIndex ? {
-            ...r,
-            action: 'link-existing',
-            match: { ...(r.match || {}), matched: catalog }
-        } : r));
-        setSearchingIndex(null);
-    };
-
-    // ─── Submit ───────────────────────────────────────────────────────────────
     const handleConfirm = async () => {
         if (!session) return;
-
-        // Validate: every selected row needs a vintage (unless NV)
         const missingVintage = rows.findIndex(r => r.selected && !r.overrides.non_vintage && !r.overrides.vintage);
-        if (missingVintage !== -1) {
-            toast.error(`Vul een jaartal in voor "${rows[missingVintage].name}" (of vink NV aan)`);
-            return;
-        }
-
+        if (missingVintage !== -1) { toast.error(`Vul een jaartal in voor "${rows[missingVintage].name}" (of vink NV aan)`); return; }
         const decisions = rows.map((r) => {
-            const line = {
-                name: r.name,
-                producer: r.producer,
-                vintage: r.vintage,
-                quantity: r.quantity,
-                unit_price: r.unit_price,
-                type_hint: r.type_hint
-            };
+            const line = { name: r.name, producer: r.producer, vintage: r.vintage, quantity: r.quantity, unit_price: r.unit_price, type_hint: r.type_hint };
             if (!r.selected) return { action: 'skip', line };
-            if (r.action === 'update-stock') {
-                return {
-                    action: 'update-stock',
-                    line,
-                    wineId: r.match?.matched?.id,
-                    wineOverrides: r.overrides
-                };
-            }
-            if (r.action === 'link-existing') {
-                return {
-                    action: 'link-existing',
-                    line,
-                    catalogId: r.match?.matched?.id,
-                    wineOverrides: r.overrides
-                };
-            }
-            return {
-                action: 'create-catalog',
-                line,
-                newCatalog: r.newCatalog,
-                wineOverrides: r.overrides
-            };
+            if (r.action === 'update-stock') return { action: 'update-stock', line, wineId: r.match?.matched?.id, wineOverrides: r.overrides };
+            if (r.action === 'link-existing') return { action: 'link-existing', line, catalogId: r.match?.matched?.id, wineOverrides: r.overrides };
+            return { action: 'create-catalog', line, newCatalog: r.newCatalog, wineOverrides: r.overrides };
         });
-
         setSaving(true);
         const toastId = toast.loading('Import uitvoeren...');
         try {
-            const { data } = await api.post('/invoice/confirm', {
-                supplier,
-                decisions
-            });
-            toast.success(
-                `Import klaar: ${data.createdWines} nieuw, ${data.updatedWines} bijgewerkt, ${data.createdCatalog} catalog-entries`,
-                { id: toastId }
-            );
-            setFile(null);
-            setSession(null);
-            setRows([]);
-            setSupplier('');
+            const { data } = await api.post('/invoice/confirm', { supplier, decisions });
+            toast.success(`Import klaar: ${data.createdWines} nieuw, ${data.updatedWines} bijgewerkt, ${data.createdCatalog} catalog-entries`, { id: toastId });
+            setFile(null); setSession(null); setRows([]); setSupplier('');
         } catch (err) {
             toast.error(err.response?.data?.error || 'Import mislukt.', { id: toastId });
         } finally {
@@ -226,65 +117,49 @@ const InvoiceImportPage = () => {
         }
     };
 
-    // ─── Render ───────────────────────────────────────────────────────────────
     const selectedCount = rows.filter(r => r.selected).length;
 
     return (
-        <div className="max-w-6xl mx-auto">
-            <h1 className="text-3xl font-black text-[#0D2B4E] mb-2">Factuur-import (AI)</h1>
-            <p className="text-slate-500 mb-6">Upload een factuur (PDF/JPG/PNG). AI extraheert de wijnen en matcht ze met de catalogus.</p>
+        <div className="max-w-6xl mx-auto space-y-6">
+            <div>
+                <h1 className="text-3xl font-bold text-white">Factuur-import (AI)</h1>
+                <p className="text-white/50">Upload een factuur (PDF/JPG/PNG). AI extraheert de wijnen en matcht ze met de catalogus.</p>
+            </div>
 
-            {/* Upload zone */}
             {!session && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
-                    <div
-                        {...getRootProps()}
-                        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition ${
-                            isDragActive ? 'border-[#1A4A7A] bg-blue-50' : 'border-slate-300 hover:border-slate-400'
-                        }`}
-                    >
+                <div className="glass rounded-2xl shadow-xl p-6">
+                    <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-8 md:p-10 text-center cursor-pointer transition ${isDragActive ? 'border-[#C4758A] bg-white/10' : 'border-white/20 hover:border-white/40 hover:bg-white/5'}`}>
                         <input {...getInputProps()} />
-                        <UploadCloud className="mx-auto mb-3 text-slate-400" size={48} />
+                        <UploadCloud className="mx-auto mb-3 text-white/30" size={48} />
                         {file ? (
-                            <p className="text-slate-700 font-medium">{file.name}</p>
+                            <p className="text-white font-medium">{file.name}</p>
                         ) : (
-                            <p className="text-slate-500">
-                                {isDragActive ? 'Laat los om te uploaden...' : 'Sleep een factuur hierheen of klik om te kiezen'}
-                            </p>
+                            <p className="text-white/50">{isDragActive ? 'Laat los om te uploaden...' : 'Sleep een factuur hierheen of klik om te kiezen'}</p>
                         )}
                     </div>
-                    <button
-                        onClick={handleExtract}
-                        disabled={!file || loading}
-                        className="mt-4 w-full py-3 bg-[#1A4A7A] text-white font-bold rounded-lg hover:bg-[#0D2B4E] disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
+                    <button onClick={handleExtract} disabled={!file || loading}
+                        className="mt-4 w-full py-3 bg-[#7B2D3A] text-white font-bold rounded-xl hover:bg-[#6A2433] disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10 transition-colors">
                         <FileText size={18} /> {loading ? 'Bezig met scannen...' : 'Scan factuur met AI'}
                     </button>
                 </div>
             )}
 
-            {/* Results / checklist */}
             {session && (
                 <>
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-4">
-                        <div className="flex items-center justify-between">
+                    <div className="glass rounded-2xl shadow-xl p-5">
+                        <div className="flex items-center justify-between gap-4">
                             <div className="flex-1">
-                                <label className="block text-xs font-semibold text-slate-600 mb-1">Leverancier</label>
-                                <input
-                                    type="text"
-                                    value={supplier}
-                                    onChange={e => setSupplier(e.target.value)}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                                />
+                                <label className="block text-xs font-semibold text-white/40 mb-1">Leverancier</label>
+                                <input type="text" value={supplier} onChange={e => setSupplier(e.target.value)} className="input-glass" />
                             </div>
-                            <div className="ml-6 text-right">
-                                <p className="text-sm text-slate-500">Geselecteerd</p>
-                                <p className="text-2xl font-black text-[#0D2B4E]">{selectedCount} / {rows.length}</p>
+                            <div className="text-right shrink-0">
+                                <p className="text-sm text-white/40">Geselecteerd</p>
+                                <p className="text-2xl font-black text-white">{selectedCount} / {rows.length}</p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-3 mb-6">
+                    <div className="space-y-3">
                         {rows.map((row, i) => {
                             const isInventoryMatch = row.action === 'update-stock' && row.match?.matched;
                             const isCatalogMatch = row.action === 'link-existing' && row.match?.matched;
@@ -292,130 +167,70 @@ const InvoiceImportPage = () => {
                             const catalogReady = row.action === 'create-catalog' && row.newCatalog.region && row.newCatalog.country;
                             const color = (isMatched || catalogReady) ? 'green' : 'amber';
                             return (
-                                <div
-                                    key={i}
-                                    className={`relative rounded-xl border-l-4 shadow-sm p-4 ${
-                                        color === 'green' ? 'border-green-500 bg-green-50' : 'border-amber-500 bg-white'
-                                    } ${!row.selected ? 'opacity-50' : ''}`}
-                                >
+                                <div key={i} className={`relative glass rounded-xl border-l-4 p-4 ${color === 'green' ? 'border-green-500/60' : 'border-amber-500/60'} ${!row.selected ? 'opacity-50' : ''}`}>
                                     {row.suggesting && (
-                                        <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center z-10">
-                                            <Loader2 size={24} className="animate-spin text-purple-600" />
-                                            <span className="ml-2 text-sm font-medium text-purple-700">AI bezig...</span>
+                                        <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center z-10 backdrop-blur-sm">
+                                            <Loader2 size={24} className="animate-spin text-white" />
+                                            <span className="ml-2 text-sm font-medium text-white">AI bezig...</span>
                                         </div>
                                     )}
                                     <div className="flex items-start gap-3">
-                                        <input
-                                            type="checkbox"
-                                            checked={row.selected}
-                                            onChange={e => updateRow(i, { selected: e.target.checked })}
-                                            className="mt-1 w-5 h-5"
-                                        />
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                {isMatched ? (
-                                                    <CheckCircle size={18} className="text-green-600" />
-                                                ) : (
-                                                    <AlertTriangle size={18} className="text-amber-600" />
-                                                )}
-                                                <p className="font-bold text-slate-800">{row.name}</p>
-                                                {row.producer && <span className="text-xs text-slate-500">· {row.producer}</span>}
-                                                <button
-                                                    onClick={() => removeRow(i)}
-                                                    className="ml-auto text-slate-300 hover:text-red-500 transition-colors"
-                                                    title="Verwijder regel"
-                                                >
-                                                    <X size={16} />
-                                                </button>
+                                        <input type="checkbox" checked={row.selected} onChange={e => updateRow(i, { selected: e.target.checked })} className="mt-1 w-5 h-5 accent-[#7B2D3A]" />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                                {isMatched ? <CheckCircle size={18} className="text-green-400 shrink-0" /> : <AlertTriangle size={18} className="text-amber-400 shrink-0" />}
+                                                <p className="font-bold text-white truncate">{row.name}</p>
+                                                {row.producer && <span className="text-xs text-white/40 hidden sm:inline">· {row.producer}</span>}
+                                                <button onClick={() => removeRow(i)} className="ml-auto text-white/20 hover:text-red-400 transition-colors shrink-0"><X size={16} /></button>
                                             </div>
 
                                             {isInventoryMatch && (
-                                                <div className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2 mb-3">
-                                                    Al in voorraad: <strong>{row.match.matched.name}</strong>
-                                                    {row.match.matched.vintage && ` (${row.match.matched.vintage})`}
-                                                    {row.match.matched.region && ` — ${row.match.matched.region}`}
-                                                    <span className="ml-2 text-green-600">· voorraad wordt bijgewerkt</span>
-                                                    <button
-                                                        onClick={() => updateRow(i, { action: 'create-catalog' })}
-                                                        className="ml-3 underline text-green-800 hover:text-green-900"
-                                                    >
-                                                        Losmaken
-                                                    </button>
+                                                <div className="text-xs bg-green-500/15 border border-green-500/25 rounded px-3 py-2 mb-3 text-green-300">
+                                                    Al in voorraad: <strong>{row.match.matched.name}</strong>{row.match.matched.vintage && ` (${row.match.matched.vintage})`} · voorraad wordt bijgewerkt
+                                                    <button onClick={() => updateRow(i, { action: 'create-catalog' })} className="ml-3 underline hover:text-white">Losmaken</button>
                                                 </div>
                                             )}
                                             {isCatalogMatch && (
-                                                <div className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2 mb-3">
-                                                    Catalogus: <strong>{row.match.matched.name}</strong>
-                                                    {row.match.matched.region && ` — ${row.match.matched.region}`}
-                                                    {row.match.matched.country && `, ${row.match.matched.country}`}
-                                                    <span className="ml-2 text-green-600">
-                                                        (score {row.match.score != null ? row.match.score.toFixed(2) : '?'})
-                                                    </span>
-                                                    <button
-                                                        onClick={() => updateRow(i, { action: 'create-catalog' })}
-                                                        className="ml-3 underline text-green-800 hover:text-green-900"
-                                                    >
-                                                        Losmaken
+                                                <div className="text-xs bg-green-500/15 border border-green-500/25 rounded px-3 py-2 mb-3 text-green-300">
+                                                    Catalogus: <strong>{row.match.matched.name}</strong>{row.match.matched.region && ` — ${row.match.matched.region}`}
+                                                    <button onClick={() => updateRow(i, { action: 'create-catalog' })} className="ml-3 underline hover:text-white">Losmaken</button>
+                                                </div>
+                                            )}
+                                            {!isMatched && !catalogReady && (
+                                                <div className="text-xs bg-amber-500/15 border border-amber-500/25 rounded px-3 py-2 mb-3 text-amber-300">
+                                                    <p className="mb-2">Geen automatische match gevonden</p>
+                                                    <button onClick={() => openSearch(i)} className="flex items-center gap-1 px-2 py-1 bg-white/10 border border-white/20 rounded text-white/70 hover:bg-white/20 transition-colors">
+                                                        <Search size={12} /> Zoek in catalogus
                                                     </button>
                                                 </div>
                                             )}
 
-                                            {!isMatched && !catalogReady && (
-                                                <div className="text-xs bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
-                                                    <p className="text-amber-800 mb-2">
-                                                        Geen automatische match gevonden met voorraad
-                                                    </p>
-                                                    <div className="flex gap-2 flex-wrap">
-                                                        <button
-                                                            onClick={() => openSearch(i)}
-                                                            className="flex items-center gap-1 px-2 py-1 bg-white border border-slate-300 rounded hover:bg-slate-50"
-                                                        >
-                                                            <Search size={12} /> Zoek in catalogus
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* New-catalog fields (editable when action === create-catalog) */}
                                             {row.action === 'create-catalog' && (
                                                 <>
-                                                {catalogReady && (
-                                                    <div className="text-xs text-green-700 bg-green-100 border border-green-200 rounded px-3 py-1.5 mb-2 flex items-center justify-between">
-                                                        <span>Nieuwe catalogus-entry aanmaken</span>
-                                                        <button onClick={() => openSearch(i)} className="underline text-green-800 hover:text-green-900 ml-2">Zoek bestaande</button>
+                                                    {catalogReady && (
+                                                        <div className="text-xs text-green-300 bg-green-500/15 border border-green-500/25 rounded px-3 py-1.5 mb-2 flex items-center justify-between">
+                                                            <span>Nieuwe catalogus-entry aanmaken</span>
+                                                            <button onClick={() => openSearch(i)} className="underline ml-2 hover:text-white">Zoek bestaande</button>
+                                                        </div>
+                                                    )}
+                                                    <div className="grid grid-cols-2 md:grid-cols-7 gap-2 mb-3">
+                                                        <InputField label="Type" value={row.newCatalog.type} onChange={v => updateNewCatalog(i, { type: v })} type="select" options={TYPE_OPTIONS} />
+                                                        <InputField label="Regio" value={row.newCatalog.region} onChange={v => updateNewCatalog(i, { region: v })} />
+                                                        <InputField label="Streek" value={row.newCatalog.subregion} onChange={v => updateNewCatalog(i, { subregion: v })} />
+                                                        <InputField label="Land" value={row.newCatalog.country} onChange={v => updateNewCatalog(i, { country: v })} />
+                                                        <InputField label="Druif" value={row.newCatalog.grape} onChange={v => updateNewCatalog(i, { grape: v })} className="md:col-span-2" />
+                                                        <InputField label="Producent" value={row.newCatalog.winery} onChange={v => updateNewCatalog(i, { winery: v })} />
                                                     </div>
-                                                )}
-                                                <div className="grid grid-cols-2 md:grid-cols-7 gap-2 mb-3">
-                                                    <InputField label="Type" value={row.newCatalog.type} onChange={v => updateNewCatalog(i, { type: v })} type="select" options={TYPE_OPTIONS} />
-                                                    <InputField label="Regio" value={row.newCatalog.region} onChange={v => updateNewCatalog(i, { region: v })} />
-                                                    <InputField label="Streek" value={row.newCatalog.subregion} onChange={v => updateNewCatalog(i, { subregion: v })} />
-                                                    <InputField label="Land" value={row.newCatalog.country} onChange={v => updateNewCatalog(i, { country: v })} />
-                                                    <InputField label="Druif" value={row.newCatalog.grape} onChange={v => updateNewCatalog(i, { grape: v })} className="md:col-span-2" />
-                                                    <InputField label="Producent" value={row.newCatalog.winery} onChange={v => updateNewCatalog(i, { winery: v })} />
-                                                </div>
                                                 </>
                                             )}
 
-                                            {/* Always-editable stock fields */}
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                                 <InputField label="Aantal" value={row.overrides.quantity} onChange={v => updateOverride(i, { quantity: +v })} type="number" />
                                                 <div>
-                                                    <InputField
-                                                        label="Jaar"
-                                                        value={row.overrides.non_vintage ? '' : row.overrides.vintage}
-                                                        onChange={v => updateOverride(i, { vintage: v })}
-                                                        type="number"
-                                                        disabled={row.overrides.non_vintage}
-                                                        placeholder={row.overrides.non_vintage ? 'NV' : ''}
-                                                    />
+                                                    <InputField label="Jaar" value={row.overrides.non_vintage ? '' : row.overrides.vintage} onChange={v => updateOverride(i, { vintage: v })} type="number" disabled={row.overrides.non_vintage} placeholder={row.overrides.non_vintage ? 'NV' : ''} />
                                                     <label className="flex items-center gap-1 mt-1 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={!!row.overrides.non_vintage}
-                                                            onChange={e => updateOverride(i, { non_vintage: e.target.checked, vintage: e.target.checked ? '' : row.overrides.vintage })}
-                                                            className="w-3 h-3"
-                                                        />
-                                                        <span className="text-[10px] text-slate-500 uppercase tracking-wide">NV</span>
+                                                        <input type="checkbox" checked={!!row.overrides.non_vintage} onChange={e => updateOverride(i, { non_vintage: e.target.checked, vintage: e.target.checked ? '' : row.overrides.vintage })} className="w-3 h-3 accent-[#7B2D3A]" />
+                                                        <span className="text-[10px] text-white/40 uppercase tracking-wide">NV</span>
                                                     </label>
                                                 </div>
                                                 <InputField label="Flesgrootte" value={row.newCatalog.bottle_size} onChange={v => updateNewCatalog(i, { bottle_size: v })} />
@@ -429,17 +244,11 @@ const InvoiceImportPage = () => {
                     </div>
 
                     <div className="flex gap-3">
-                        <button
-                            onClick={() => { setSession(null); setRows([]); setFile(null); }}
-                            className="px-4 py-3 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50"
-                        >
-                            <Trash2 size={16} className="inline mr-1" /> Annuleer
+                        <button onClick={() => { setSession(null); setRows([]); setFile(null); }} className="px-4 py-3 border border-white/20 rounded-xl text-white/60 hover:bg-white/10 transition-colors flex items-center gap-1">
+                            <Trash2 size={16} /> Annuleer
                         </button>
-                        <button
-                            onClick={handleConfirm}
-                            disabled={saving || selectedCount === 0}
-                            className="flex-1 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
+                        <button onClick={handleConfirm} disabled={saving || selectedCount === 0}
+                            className="flex-1 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10 transition-colors">
                             <Save size={18} /> {saving ? 'Importeren...' : `Bevestig import (${selectedCount})`}
                         </button>
                     </div>
@@ -448,52 +257,34 @@ const InvoiceImportPage = () => {
 
             {/* Search modal */}
             {searchingIndex != null && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSearchingIndex(null)}>
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-                            <h3 className="font-bold text-lg">Zoek in catalogus</h3>
-                            <button onClick={() => setSearchingIndex(null)}><X size={20} /></button>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSearchingIndex(null)}>
+                    <div className="glass rounded-2xl shadow-2xl max-w-xl w-full max-h-[80vh] flex flex-col border border-white/15" onClick={e => e.stopPropagation()}>
+                        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                            <h3 className="font-bold text-lg text-white">Zoek in catalogus</h3>
+                            <button onClick={() => setSearchingIndex(null)} className="text-white/40 hover:text-white"><X size={20} /></button>
                         </div>
                         <div className="p-4">
-                            <input
-                                autoFocus
-                                type="text"
-                                value={searchQuery}
-                                onChange={e => runSearch(e.target.value)}
-                                placeholder="Wijnnaam..."
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                            />
+                            <input autoFocus type="text" value={searchQuery} onChange={e => runSearch(e.target.value)} placeholder="Wijnnaam..." className="input-glass" />
                         </div>
                         <div className="flex-1 overflow-y-auto px-4 pb-4">
                             {searchResults.length === 0 ? (
-                                <p className="text-sm text-slate-400 text-center py-6">Geen resultaten.</p>
+                                <p className="text-sm text-white/30 text-center py-6">Geen resultaten.</p>
                             ) : (
                                 <ul className="space-y-1">
                                     {searchResults.map(c => (
                                         <li key={c.id}>
-                                            <button
-                                                onClick={() => pickCatalog(c)}
-                                                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 border border-slate-200"
-                                            >
-                                                <p className="font-semibold text-sm text-slate-800">{c.name}</p>
-                                                <p className="text-xs text-slate-500">
-                                                    {[c.region, c.country, c.vintage].filter(Boolean).join(' · ')}
-                                                </p>
+                                            <button onClick={() => pickCatalog(c)} className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 border border-white/10 transition-colors">
+                                                <p className="font-semibold text-sm text-white">{c.name}</p>
+                                                <p className="text-xs text-white/40">{[c.region, c.country, c.vintage].filter(Boolean).join(' · ')}</p>
                                             </button>
                                         </li>
                                     ))}
                                 </ul>
                             )}
                         </div>
-                        <div className="p-4 border-t border-slate-200">
-                            <button
-                                onClick={() => {
-                                    setSearchingIndex(null);
-                                    handleSuggest(searchingIndex);
-                                }}
-                                disabled={rows[searchingIndex]?.suggesting}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium"
-                            >
+                        <div className="p-4 border-t border-white/10">
+                            <button onClick={() => { const idx = searchingIndex; setSearchingIndex(null); handleSuggest(idx); }} disabled={rows[searchingIndex]?.suggesting}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[#7B2D3A] text-white rounded-xl hover:bg-[#6A2433] disabled:opacity-50 text-sm font-medium border border-white/10 transition-colors">
                                 <Sparkles size={14} /> {rows[searchingIndex]?.suggesting ? 'Bezig...' : 'AI-suggestie'}
                             </button>
                         </div>
@@ -503,31 +294,5 @@ const InvoiceImportPage = () => {
         </div>
     );
 };
-
-const InputField = ({ label, value, onChange, type = 'text', step, options, className, placeholder, disabled }) => (
-    <div className={className}>
-        <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</label>
-        {type === 'select' ? (
-            <select
-                value={value}
-                onChange={e => onChange(e.target.value)}
-                disabled={disabled}
-                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded disabled:bg-slate-100 disabled:text-slate-400"
-            >
-                {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-        ) : (
-            <input
-                type={type}
-                step={step}
-                value={value}
-                onChange={e => onChange(e.target.value)}
-                placeholder={placeholder}
-                disabled={disabled}
-                className="w-full px-2 py-1.5 text-sm border border-slate-300 rounded disabled:bg-slate-100 disabled:text-slate-400"
-            />
-        )}
-    </div>
-);
 
 export default InvoiceImportPage;
