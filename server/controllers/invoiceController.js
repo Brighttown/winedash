@@ -5,7 +5,7 @@ import { existsSync, mkdirSync } from 'fs';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ocrInvoiceFile } from '../utils/ocr.js';
 import { extractInvoice, suggestWineMetadata } from '../utils/llmClient.js';
-import { matchLines } from '../utils/catalogMatcher.js';
+import { matchLines, matchInventoryLines } from '../utils/catalogMatcher.js';
 import { TYPE_MAP } from '../utils/wineTypes.js';
 import prisma from '../utils/prisma.js';
 
@@ -46,6 +46,8 @@ export const invoiceUploadConfig = multer({
 export const extractInvoiceHandler = asyncHandler(async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Geen bestand geüpload' });
 
+    const { company_id } = req.user;
+
     try {
         const ocrText = await ocrInvoiceFile(req.file.path, req.file.originalname);
         console.log('[invoice] OCR tekst (eerste 500 tekens):', ocrText.slice(0, 500));
@@ -54,11 +56,13 @@ export const extractInvoiceHandler = asyncHandler(async (req, res) => {
         console.log('[invoice] LLM extractie:', JSON.stringify(extracted, null, 2));
 
         const lines = Array.isArray(extracted.lines) ? extracted.lines : [];
-        const matches = await matchLines(lines);
+        const catalogMatches = await matchLines(lines);
+        const inventoryMatches = await matchInventoryLines(lines, company_id);
 
+        // Prefer catalog match; fall back to inventory match
         const enrichedLines = lines.map((line, i) => ({
             ...line,
-            match: matches[i]
+            match: catalogMatches[i].matched ? catalogMatches[i] : inventoryMatches[i]
         }));
 
         const sessionId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -131,6 +135,26 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                 : null;
             const rawVintage = decision.wineOverrides?.vintage ?? line.vintage;
             const vintage = rawVintage ? Number(rawVintage) : null;
+
+            // ── update-stock: direct voorraad bijwerken op bestaande wijn ───────
+            if (decision.action === 'update-stock' && decision.wineId) {
+                const existing = await tx.wine.findFirst({ where: { id: decision.wineId, company_id } });
+                if (!existing) throw new Error(`Wijn niet gevonden: ${decision.wineId}`);
+                await tx.wine.update({
+                    where: { id: existing.id },
+                    data: {
+                        stock_count: { increment: quantity },
+                        purchase_price: purchasePrice || existing.purchase_price,
+                        supplier: supplierName
+                    }
+                });
+                await tx.stockMovement.create({
+                    data: { wine_id: existing.id, type: 'purchase', quantity, note: `Factuur-import: ${supplierName}` }
+                });
+                updatedWines++;
+                movements++;
+                continue;
+            }
 
             // Resolve catalog entry (either existing or newly created)
             let catalog = null;

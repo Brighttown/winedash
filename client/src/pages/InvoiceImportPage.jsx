@@ -59,7 +59,9 @@ const InvoiceImportPage = () => {
             setSupplier(data.supplier || '');
             setRows(data.lines.map(line => ({
                 ...line,
-                action: line.match?.matched ? 'link-existing' : 'create-catalog',
+                action: line.match?.fromInventory && line.match?.matched
+                    ? 'update-stock'
+                    : line.match?.matched ? 'link-existing' : 'create-catalog',
                 selected: true,
                 newCatalog: {
                     name: line.name || '',
@@ -178,6 +180,14 @@ const InvoiceImportPage = () => {
                 type_hint: r.type_hint
             };
             if (!r.selected) return { action: 'skip', line };
+            if (r.action === 'update-stock') {
+                return {
+                    action: 'update-stock',
+                    line,
+                    wineId: r.match?.matched?.id,
+                    wineOverrides: r.overrides
+                };
+            }
             if (r.action === 'link-existing') {
                 return {
                     action: 'link-existing',
@@ -276,7 +286,9 @@ const InvoiceImportPage = () => {
 
                     <div className="space-y-3 mb-6">
                         {rows.map((row, i) => {
-                            const isMatched = row.action === 'link-existing' && row.match?.matched;
+                            const isInventoryMatch = row.action === 'update-stock' && row.match?.matched;
+                            const isCatalogMatch = row.action === 'link-existing' && row.match?.matched;
+                            const isMatched = isInventoryMatch || isCatalogMatch;
                             const catalogReady = row.action === 'create-catalog' && row.newCatalog.region && row.newCatalog.country;
                             const color = (isMatched || catalogReady) ? 'green' : 'amber';
                             return (
@@ -317,9 +329,23 @@ const InvoiceImportPage = () => {
                                                 </button>
                                             </div>
 
-                                            {isMatched && (
+                                            {isInventoryMatch && (
                                                 <div className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2 mb-3">
-                                                    Match: <strong>{row.match.matched.name}</strong>
+                                                    Al in voorraad: <strong>{row.match.matched.name}</strong>
+                                                    {row.match.matched.vintage && ` (${row.match.matched.vintage})`}
+                                                    {row.match.matched.region && ` — ${row.match.matched.region}`}
+                                                    <span className="ml-2 text-green-600">· voorraad wordt bijgewerkt</span>
+                                                    <button
+                                                        onClick={() => updateRow(i, { action: 'create-catalog' })}
+                                                        className="ml-3 underline text-green-800 hover:text-green-900"
+                                                    >
+                                                        Losmaken
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {isCatalogMatch && (
+                                                <div className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2 mb-3">
+                                                    Catalogus: <strong>{row.match.matched.name}</strong>
                                                     {row.match.matched.region && ` — ${row.match.matched.region}`}
                                                     {row.match.matched.country && `, ${row.match.matched.country}`}
                                                     <span className="ml-2 text-green-600">

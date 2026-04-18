@@ -91,8 +91,10 @@ export async function extractInvoice(ocrText) {
                     'Gebruik je kennis van wijnamen, producenten en regio\'s om dergelijke fouten te corrigeren in de output. ' +
                     'Extraheer ELKE wijnregel: naam, producent, hoeveelheid en prijs. ' +
                     'Vul het oogstjaar ALLEEN in als het expliciet vermeld staat in de tekst (bv. "Château X 2019" → vintage 2019). Laat vintage leeg als het ontbreekt. ' +
-                    'Negeer kopteksten, categorie-labels, BTW-regels en tekst die geen echte wijn is. ' +
-                    'Als het type niet zeker is, leid het af uit de sectie-header (bv. "Vins Rouges" → red).\n\n' +
+                    'Sommige wijnen hebben geen jaar (NV = non-vintage), zoals mousserende wijnen of cocktailwijnen (bv. "Veuve du Vernay ICE"). Extraheer deze ook — laat vintage dan leeg. ' +
+                    'Productnummers zoals "VEUV05500" zijn GEEN jaren. Leid het jaar alleen af uit een 4-cijferig getal tussen 1980 en 2030 in de omschrijving zelf. ' +
+                    'Negeer kopteksten, categorie-labels, BTW-regels, totaalregels en tekst die geen echte wijn is. ' +
+                    'Als het type niet zeker is, leid het af uit de sectie-header of naam (bv. "Vins Rouges" → red, "Sparkling" → sparkling, "Rosé" → rose).\n\n' +
                     '--- TEKST ---\n' + chunk
             }]
         });

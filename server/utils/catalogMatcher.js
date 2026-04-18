@@ -81,3 +81,55 @@ export async function matchLines(lines) {
     }
     return results;
 }
+
+// ─── Inventory matching (Wine table per company) ───────────────────────────────
+
+async function matchInventoryLine(line, company_id) {
+    const tokens = [...new Set([...tokenize(line.name), ...tokenize(line.producer)])];
+    if (tokens.length === 0) return { matched: null, score: null, fromInventory: true };
+
+    const ors = tokens.slice(0, 5).map(tok => ({
+        name: { contains: tok, mode: 'insensitive' }
+    }));
+
+    const pool = await prisma.wine.findMany({
+        where: { company_id, OR: ors },
+        take: MAX_DB_CANDIDATES
+    });
+
+    if (pool.length === 0) return { matched: null, score: null, fromInventory: true };
+
+    const fuse = new Fuse(pool, {
+        includeScore: true,
+        threshold: 0.7,
+        keys: [{ name: 'name', weight: 1.0 }]
+    });
+
+    let results = fuse.search(line.name).slice(0, MAX_CANDIDATES);
+
+    if (line.vintage) {
+        results = results.map(r => ({
+            ...r,
+            score: r.item.vintage === line.vintage
+                ? Math.max(0, r.score - 0.1)
+                : r.score + 0.1
+        }));
+        results.sort((a, b) => a.score - b.score);
+    }
+
+    const best = results[0];
+    return {
+        matched: best && best.score <= MATCH_THRESHOLD ? best.item : null,
+        score: best ? best.score : null,
+        fromInventory: true
+    };
+}
+
+/** For each line without a catalog match, try to find an existing Wine in inventory. */
+export async function matchInventoryLines(lines, company_id) {
+    const results = [];
+    for (const line of lines) {
+        results.push(await matchInventoryLine(line, company_id));
+    }
+    return results;
+}
