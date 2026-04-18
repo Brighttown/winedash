@@ -214,13 +214,13 @@ const Wines = () => {
             {mutationsWine && <StockMutationsModal wine={mutationsWine} onClose={() => setMutationsWine(null)} onStockChanged={fetchWines} />}
 
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="glass rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-white/15">
-                        <div className="sticky top-0 glass border-b border-white/10 p-5 flex justify-between items-center z-10">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="glass rounded-2xl shadow-2xl w-full max-w-2xl border border-white/15 flex flex-col" style={{ maxHeight: '90dvh' }}>
+                        <div className="border-b border-white/10 p-5 flex justify-between items-center shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }}>
                             <h2 className="text-xl font-bold text-white">{editId ? 'Wijn Bewerken' : 'Nieuwe Wijn Toevoegen'}</h2>
                             <button onClick={() => setIsModalOpen(false)} className="text-white/40 hover:text-white bg-white/10 p-2 rounded-full transition-colors"><X size={20} /></button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+                        <form onSubmit={handleSubmit} className="overflow-y-auto p-5 space-y-5">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {[
                                     { label: 'Naam', key: 'name', type: 'text', required: true },

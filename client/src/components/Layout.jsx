@@ -188,16 +188,16 @@ const Layout = () => {
                     )}
                 </header>
 
-                <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+                <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-28 md:pb-8">
                     <Outlet />
                 </main>
             </div>
 
             {/* ── Mobiele bottom navigation ── */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 shadow-2xl overflow-hidden">
-                <div className="absolute inset-0" style={{ backgroundImage: "url('/vineyard.avif')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                <div className="absolute inset-0 bg-black/60 border-t border-white/10" />
-                <nav className="relative z-10 flex items-center justify-around px-2 py-2 max-w-lg mx-auto">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 shadow-2xl">
+                <div className="absolute inset-0 scale-110" style={{ backgroundImage: "url('/vineyard.avif')", backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(6px)' }} />
+                <div className="absolute inset-0 bg-black/65 border-t border-white/10" />
+                <nav className="relative z-10 flex items-center justify-around px-2 pt-2" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
                     <NavLink to="/" end className={() => mobileNavClass('/')}>
                         <LayoutDashboard size={22} />
                         <span>Home</span>

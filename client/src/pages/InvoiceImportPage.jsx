@@ -257,7 +257,7 @@ const InvoiceImportPage = () => {
 
             {/* Search modal */}
             {searchingIndex != null && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSearchingIndex(null)}>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setSearchingIndex(null)}>
                     <div className="glass rounded-2xl shadow-2xl max-w-xl w-full max-h-[80vh] flex flex-col border border-white/15" onClick={e => e.stopPropagation()}>
                         <div className="p-4 border-b border-white/10 flex items-center justify-between">
                             <h3 className="font-bold text-lg text-white">Zoek in catalogus</h3>

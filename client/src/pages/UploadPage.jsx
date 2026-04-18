@@ -240,7 +240,7 @@ const UploadPage = () => {
 
             {/* Matching Modal */}
             {matchingIndex !== null && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
                     <div className="glass rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] border border-white/15">
                         <div className="p-5 md:p-6 bg-[#7B2D3A]/40 border-b border-white/10 flex justify-between items-center">
                             <div>
