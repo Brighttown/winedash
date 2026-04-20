@@ -216,6 +216,7 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
             } else {
                 const created = await tx.wine.create({
                     data: {
+                        catalog_id: catalog?.id ?? null,
                         name: wineName,
                         type: wineType,
                         region: wineRegion,

@@ -34,6 +34,8 @@ model Company {
 
 model Wine {
   id               String   @id @default(uuid())
+  catalog_id       String?
+  catalog          WineCatalog? @relation(fields: [catalog_id], references: [id])
   name             String
   region           String
   subregion        String?
@@ -68,6 +70,7 @@ model StockMovement {
 
 model WineCatalog {
   id               String   @id @default(uuid())
+  wines            Wine[]
   name             String   @unique
   region           String
   subregion        String?

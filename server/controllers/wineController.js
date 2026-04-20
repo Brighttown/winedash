@@ -100,6 +100,26 @@ export const updateWine = asyncHandler(async (req, res) => {
         data: parsed.data
     });
 
+    // Sync metadata changes to WineCatalog (source of truth)
+    const catalogId = updatedWine.catalog_id;
+    const metadataFields = ['name', 'type', 'region', 'subregion', 'country', 'vintage', 'grape', 'winery', 'bottle_size'];
+    const catalogUpdate = Object.fromEntries(
+        metadataFields.filter(k => parsed.data[k] !== undefined).map(k => [k, parsed.data[k]])
+    );
+
+    if (Object.keys(catalogUpdate).length > 0) {
+        if (catalogId) {
+            await prisma.wineCatalog.update({ where: { id: catalogId }, data: catalogUpdate }).catch(() => {});
+        } else {
+            // Try to find catalog entry by name and link it
+            const match = await prisma.wineCatalog.findFirst({ where: { name: { equals: updatedWine.name, mode: 'insensitive' } } });
+            if (match) {
+                await prisma.wineCatalog.update({ where: { id: match.id }, data: catalogUpdate });
+                await prisma.wine.update({ where: { id }, data: { catalog_id: match.id } });
+            }
+        }
+    }
+
     res.json(updatedWine);
 });
 
