@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Wine, Upload, LogOut, Database, FileSpreadsheet,
     Users, ShieldCheck, CheckSquare, Sparkles, Plus, X,
-    Package, BookOpen
+    Package, BookOpen, ScrollText
 } from 'lucide-react';
 
 const Layout = () => {
@@ -146,6 +146,10 @@ const Layout = () => {
                                     <FileSpreadsheet size={18} className="shrink-0" />
                                     <span>Excel Import</span>
                                 </NavLink>
+                                <NavLink to="/wijnkaart-import" className={navClass}>
+                                    <ScrollText size={18} className="shrink-0" />
+                                    <span>Wijnkaart Import</span>
+                                </NavLink>
                             </>
                         )}
                     </nav>
@@ -283,6 +287,10 @@ const Layout = () => {
                                         <button onClick={() => { navigate('/excel-import'); setAddMenuOpen(false); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-white/10 transition-colors text-left">
                                             <div className="w-10 h-10 rounded-full bg-[#1B4332]/80 border border-white/10 flex items-center justify-center shrink-0"><FileSpreadsheet size={20} className="text-green-300" /></div>
                                             <div><p className="text-sm font-semibold text-white">Excel Import</p><p className="text-xs text-white/40">Importeer via spreadsheet</p></div>
+                                        </button>
+                                        <button onClick={() => { navigate('/wijnkaart-import'); setAddMenuOpen(false); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-white/10 transition-colors text-left">
+                                            <div className="w-10 h-10 rounded-full bg-[#7B2D3A]/50 border border-white/10 flex items-center justify-center shrink-0"><ScrollText size={20} className="text-[#C4758A]" /></div>
+                                            <div><p className="text-sm font-semibold text-white">Wijnkaart Import</p><p className="text-xs text-white/40">Upload wijnkaart van restaurant</p></div>
                                         </button>
                                     </>
                                 )}
