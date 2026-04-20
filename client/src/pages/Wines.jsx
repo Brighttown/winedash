@@ -1,15 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api/axios';
 import { toast } from 'react-hot-toast';
-import { Plus, Search, Edit2, Trash2, FileDown, X, ClipboardList, ChevronRight } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, FileDown, X, ClipboardList, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import StockMutationsModal from '../components/StockMutationsModal';
 import { useNavigate } from 'react-router-dom';
 
+const TYPE_LABELS = { red: 'Rood', white: 'Wit', rose: 'Rosé', sparkling: 'Bubbels', dessert: 'Dessert' };
+
+const FilterSelect = ({ label, value, onChange, options, all = 'Alle' }) => (
+    <div className="flex flex-col gap-1">
+        <label className="text-xs font-bold uppercase tracking-wider text-white/40">{label}</label>
+        <select value={value} onChange={e => onChange(e.target.value)} className="select-glass text-sm font-medium">
+            <option value="">{all}</option>
+            {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+    </div>
+);
+
 const Wines = () => {
     const [wines, setWines] = useState([]);
-    const [filtered, setFiltered] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [mutationsWine, setMutationsWine] = useState(null);
     const [formData, setFormData] = useState({
@@ -19,11 +29,18 @@ const Wines = () => {
     const [editId, setEditId] = useState(null);
     const navigate = useNavigate();
 
+    const [search, setSearch] = useState('');
+    const [filterType, setFilterType] = useState('');
+    const [filterCountry, setFilterCountry] = useState('');
+    const [filterGrape, setFilterGrape] = useState('');
+    const [filterWinery, setFilterWinery] = useState('');
+    const [filterVintageMin, setFilterVintageMin] = useState('');
+    const [filterVintageMax, setFilterVintageMax] = useState('');
+
     const fetchWines = async () => {
         try {
             const { data } = await api.get('/wines');
             setWines(data);
-            setFiltered(data);
         } catch (err) {
             toast.error('Kan wijnen niet laden');
         } finally {
@@ -33,15 +50,27 @@ const Wines = () => {
 
     useEffect(() => { fetchWines(); }, []);
 
-    useEffect(() => {
+    const countries = useMemo(() => [...new Set(wines.map(w => w.country).filter(Boolean))].sort(), [wines]);
+    const grapes    = useMemo(() => { const all = wines.flatMap(w => w.grape ? w.grape.split(',').map(g => g.trim()) : []); return [...new Set(all)].filter(Boolean).sort(); }, [wines]);
+    const wineries  = useMemo(() => [...new Set(wines.map(w => w.winery).filter(Boolean))].sort(), [wines]);
+
+    const activeFilterCount = [filterType, filterCountry, filterGrape, filterWinery, filterVintageMin, filterVintageMax].filter(Boolean).length;
+
+    const clearFilters = () => { setSearch(''); setFilterType(''); setFilterCountry(''); setFilterGrape(''); setFilterWinery(''); setFilterVintageMin(''); setFilterVintageMax(''); };
+
+    const filtered = useMemo(() => {
         const lower = search.toLowerCase();
-        setFiltered(wines.filter(w =>
-            w.name.toLowerCase().includes(lower) ||
-            w.region?.toLowerCase().includes(lower) ||
-            w.type?.toLowerCase().includes(lower) ||
-            w.country?.toLowerCase().includes(lower)
-        ));
-    }, [search, wines]);
+        return wines.filter(w => {
+            if (search && !w.name.toLowerCase().includes(lower) && !w.region?.toLowerCase().includes(lower) && !w.country?.toLowerCase().includes(lower) && !w.winery?.toLowerCase().includes(lower)) return false;
+            if (filterType && w.type !== filterType) return false;
+            if (filterCountry && w.country !== filterCountry) return false;
+            if (filterGrape && !(w.grape || '').includes(filterGrape)) return false;
+            if (filterWinery && w.winery !== filterWinery) return false;
+            if (filterVintageMin && w.vintage < parseInt(filterVintageMin)) return false;
+            if (filterVintageMax && w.vintage > parseInt(filterVintageMax)) return false;
+            return true;
+        });
+    }, [wines, search, filterType, filterCountry, filterGrape, filterWinery, filterVintageMin, filterVintageMax]);
 
     const navigateToCatalog = async (wine) => {
         try {
@@ -129,15 +158,42 @@ const Wines = () => {
                 </div>
             </div>
 
-            {/* Search */}
-            <div className="glass rounded-2xl shadow-xl overflow-hidden">
-                <div className="p-4 border-b border-white/10 bg-white/5">
-                    <div className="relative w-full max-w-md">
-                        <Search className="absolute top-2.5 left-3 text-white/40" size={18} />
-                        <input type="text" placeholder="Zoek op naam, regio, type..." value={search} onChange={e => setSearch(e.target.value)} className="input-glass pl-10" />
+            {/* Filters */}
+            <div className="glass rounded-2xl shadow-xl p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                        <Search className="absolute top-2.5 left-3 text-white/40" size={17} />
+                        <input type="text" placeholder="Zoek op naam, regio, land of wijnhuis..." value={search} onChange={e => setSearch(e.target.value)} className="input-glass pl-9" />
+                    </div>
+                    <div className="flex items-center gap-2 text-white/50 text-sm font-semibold shrink-0">
+                        <SlidersHorizontal size={16} />
+                        {activeFilterCount > 0 && (
+                            <button onClick={clearFilters} className="flex items-center gap-1 bg-red-500/20 text-red-300 border border-red-500/30 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-red-500/30 transition-colors">
+                                <X size={12} /> {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} wissen
+                            </button>
+                        )}
                     </div>
                 </div>
 
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <FilterSelect label="Type" value={filterType} onChange={setFilterType} options={Object.keys(TYPE_LABELS)} all="Alle types" />
+                    <FilterSelect label="Land" value={filterCountry} onChange={setFilterCountry} options={countries} all="Alle landen" />
+                    <FilterSelect label="Druif" value={filterGrape} onChange={setFilterGrape} options={grapes} all="Alle druiven" />
+                    <FilterSelect label="Wijnhuis" value={filterWinery} onChange={setFilterWinery} options={wineries} all="Alle wijnhuizen" />
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-white/40">Jaar vanaf</label>
+                        <input type="number" placeholder="bv. 2010" value={filterVintageMin} onChange={e => setFilterVintageMin(e.target.value)} className="input-glass py-2 text-sm" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold uppercase tracking-wider text-white/40">Jaar t/m</label>
+                        <input type="number" placeholder="bv. 2023" value={filterVintageMax} onChange={e => setFilterVintageMax(e.target.value)} className="input-glass py-2 text-sm" />
+                    </div>
+                </div>
+                <p className="text-xs text-white/30">{filtered.length} van de {wines.length} wijnen zichtbaar</p>
+            </div>
+
+            {/* Tabel */}
+            <div className="glass rounded-2xl shadow-xl overflow-hidden">
                 {loading ? (
                     <div className="text-center p-12"><div className="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto" /></div>
                 ) : (
@@ -148,6 +204,7 @@ const Wines = () => {
                                 <thead>
                                     <tr className="bg-white/5 text-white/30 text-xs uppercase tracking-wider font-semibold border-b border-white/10">
                                         <th className="p-4">Naam / Regio</th>
+                                        <th className="p-4">Wijnhuis</th>
                                         <th className="p-4">Type</th>
                                         <th className="p-4">Voorraad</th>
                                         <th className="p-4">Inkoop</th>
@@ -162,8 +219,9 @@ const Wines = () => {
                                                 <div className="font-bold text-white group-hover:text-[#C4758A] transition-colors">{wine.name} {wine.vintage && <span className="text-white/30 font-normal">({wine.vintage})</span>}</div>
                                                 <div className="text-white/40 text-xs mt-0.5">{wine.region}, {wine.country}</div>
                                             </td>
+                                            <td className="p-4 text-white/60 text-sm">{wine.winery || <span className="text-white/20">—</span>}</td>
                                             <td className="p-4">
-                                                <span className="capitalize px-2.5 py-1 bg-white/10 text-white/60 rounded-md font-medium text-xs border border-white/10">{wine.type}</span>
+                                                <span className="capitalize px-2.5 py-1 bg-white/10 text-white/60 rounded-md font-medium text-xs border border-white/10">{TYPE_LABELS[wine.type] || wine.type}</span>
                                             </td>
                                             <td className="p-4">
                                                 <span className={`px-2.5 py-1 rounded-md font-bold text-xs ${getStockColor(wine.stock_count, wine.min_stock_alert)}`}>
@@ -179,7 +237,7 @@ const Wines = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    {filtered.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-white/30 italic">Geen wijnen gevonden</td></tr>}
+                                    {filtered.length === 0 && <tr><td colSpan="7" className="p-8 text-center text-white/30 italic">Geen wijnen gevonden</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -193,8 +251,9 @@ const Wines = () => {
                                         <p className="font-bold text-white text-sm leading-tight truncate">
                                             {wine.name} {wine.vintage && <span className="text-white/40 font-normal">({wine.vintage})</span>}
                                         </p>
+                                        {wine.winery && <p className="text-xs text-white/40 truncate">{wine.winery}</p>}
                                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                            <span className="capitalize text-[10px] px-1.5 py-0.5 bg-white/10 text-white/50 rounded border border-white/10">{wine.type}</span>
+                                            <span className="capitalize text-[10px] px-1.5 py-0.5 bg-white/10 text-white/50 rounded border border-white/10">{TYPE_LABELS[wine.type] || wine.type}</span>
                                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${getStockColor(wine.stock_count, wine.min_stock_alert)}`}>{wine.stock_count} fl.</span>
                                             <span className="text-[10px] text-white/40">€{wine.purchase_price?.toFixed(2)} · €{wine.sell_price?.toFixed(2)}</span>
                                         </div>

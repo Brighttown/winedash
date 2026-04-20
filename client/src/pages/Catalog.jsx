@@ -34,8 +34,6 @@ const Catalog = () => {
     const [filterType, setFilterType] = useState('');
     const [filterCountry, setFilterCountry] = useState('');
     const [filterGrape, setFilterGrape] = useState('');
-    const [filterBody, setFilterBody] = useState('');
-    const [filterAcidity, setFilterAcidity] = useState('');
     const [filterVintageMin, setFilterVintageMin] = useState('');
     const [filterVintageMax, setFilterVintageMax] = useState('');
 
@@ -55,11 +53,9 @@ const Catalog = () => {
 
     const countries  = useMemo(() => [...new Set(catalog.map(w => w.country).filter(Boolean))].sort(), [catalog]);
     const grapes     = useMemo(() => { const all = catalog.flatMap(w => w.grape ? w.grape.split(',').map(g => g.trim()) : []); return [...new Set(all)].filter(Boolean).sort(); }, [catalog]);
-    const bodies     = useMemo(() => [...new Set(catalog.map(w => w.body).filter(Boolean))].sort(), [catalog]);
-    const acidities  = useMemo(() => [...new Set(catalog.map(w => w.acidity).filter(Boolean))].sort(), [catalog]);
-    const activeFilterCount = [filterType, filterCountry, filterGrape, filterBody, filterAcidity, filterVintageMin, filterVintageMax].filter(Boolean).length;
+    const activeFilterCount = [filterType, filterCountry, filterGrape, filterVintageMin, filterVintageMax].filter(Boolean).length;
 
-    const clearFilters = () => { setSearch(''); setFilterType(''); setFilterCountry(''); setFilterGrape(''); setFilterBody(''); setFilterAcidity(''); setFilterVintageMin(''); setFilterVintageMax(''); };
+    const clearFilters = () => { setSearch(''); setFilterType(''); setFilterCountry(''); setFilterGrape(''); setFilterVintageMin(''); setFilterVintageMax(''); };
 
     const filtered = useMemo(() => {
         const lower = search.toLowerCase();
@@ -68,13 +64,11 @@ const Catalog = () => {
             if (filterType && w.type !== filterType) return false;
             if (filterCountry && w.country !== filterCountry) return false;
             if (filterGrape && !(w.grape || '').includes(filterGrape)) return false;
-            if (filterBody && w.body !== filterBody) return false;
-            if (filterAcidity && w.acidity !== filterAcidity) return false;
             if (filterVintageMin && w.vintage < parseInt(filterVintageMin)) return false;
             if (filterVintageMax && w.vintage > parseInt(filterVintageMax)) return false;
             return true;
         });
-    }, [catalog, search, filterType, filterCountry, filterGrape, filterBody, filterAcidity, filterVintageMin, filterVintageMax]);
+    }, [catalog, search, filterType, filterCountry, filterGrape, filterVintageMin, filterVintageMax]);
 
     return (
         <div className="max-w-7xl mx-auto space-y-5">
@@ -109,12 +103,10 @@ const Catalog = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     <FilterSelect label="Type" value={filterType} onChange={setFilterType} options={Object.keys(TYPE_LABELS)} all="Alle types" />
                     <FilterSelect label="Land" value={filterCountry} onChange={setFilterCountry} options={countries} all="Alle landen" />
                     <FilterSelect label="Druif" value={filterGrape} onChange={setFilterGrape} options={grapes} all="Alle druiven" />
-                    <FilterSelect label="Body" value={filterBody} onChange={setFilterBody} options={bodies} all="Alle body's" />
-                    <FilterSelect label="Zuurgraad" value={filterAcidity} onChange={setFilterAcidity} options={acidities} all="Alle zuurgraden" />
                     <div className="flex flex-col gap-1">
                         <label className="text-xs font-bold uppercase tracking-wider text-white/40">Jaar vanaf</label>
                         <input type="number" placeholder="bv. 2010" value={filterVintageMin} onChange={e => setFilterVintageMin(e.target.value)} className="input-glass py-2 text-sm" />
