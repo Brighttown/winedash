@@ -28,32 +28,24 @@ model Company {
   secondary_color String?
   user_id         String
   user            User     @relation(fields: [user_id], references: [id])
-  
+
   wines           Wine[]
 }
 
 model Wine {
-  id               String   @id @default(uuid())
-  catalog_id       String?
-  catalog          WineCatalog? @relation(fields: [catalog_id], references: [id])
-  name             String
-  region           String
-  subregion        String?
-  country          String
-  vintage          Int?
-  grape            String
-  type             String   // red/white/rose/sparkling
-  bottle_size      String?
-  supplier         String?
-  winery           String?
-  purchase_price   Float
-  sell_price       Float?
-  stock_count      Int      @default(0)
-  min_stock_alert  Int      @default(0)
-  days_in_stock    Int      @default(0)
+  id               String      @id @default(uuid())
+  catalog_id       String
+  catalog          WineCatalog @relation(fields: [catalog_id], references: [id])
   company_id       String
-  company          Company  @relation(fields: [company_id], references: [id])
-  created_at       DateTime @default(now())
+  company          Company     @relation(fields: [company_id], references: [id])
+  vintage          Int?
+  supplier         String?
+  purchase_price   Float       @default(0)
+  sell_price       Float?
+  stock_count      Int         @default(0)
+  min_stock_alert  Int         @default(0)
+  days_in_stock    Int         @default(0)
+  created_at       DateTime    @default(now())
 
   stock_movements  StockMovement[]
 }
@@ -70,7 +62,6 @@ model StockMovement {
 
 model WineCatalog {
   id               String   @id @default(uuid())
-  wines            Wine[]
   name             String   @unique
   region           String
   subregion        String?
@@ -92,5 +83,6 @@ model WineCatalog {
 
   is_verified      Boolean  @default(true)
   created_at       DateTime @default(now())
-}
 
+  wines            Wine[]
+}

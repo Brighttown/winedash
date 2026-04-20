@@ -34,12 +34,8 @@ const AddToStockModal = ({ wine, isOpen, onClose, onSuccess }) => {
         setLoading(true);
         try {
             await api.post('/wines', {
-                name: wine.name,
-                region: wine.region,
-                country: wine.country,
-                vintage: parseInt(formData.vintage, 10),
-                grape: wine.grape || '',
-                type: wine.type,
+                catalog_id: wine.id,
+                vintage: formData.vintage ? parseInt(formData.vintage, 10) : null,
                 supplier: formData.supplier,
                 purchase_price: parseFloat(formData.purchase_price),
                 sell_price: parseFloat(formData.sell_price),

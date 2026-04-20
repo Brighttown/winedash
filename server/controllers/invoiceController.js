@@ -185,18 +185,11 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                 createdCatalog++;
             }
 
-            const wineName = String(decision.wineOverrides?.name ?? catalog?.name ?? line.name).trim();
-            const wineType = catalog?.type || TYPE_MAP[String(line.type_hint || '').toLowerCase()] || 'red';
-            const wineRegion = catalog?.region || 'Onbekend';
-            const wineSubregion = catalog?.subregion || null;
-            const wineCountry = catalog?.country || 'Onbekend';
-            const wineGrape = catalog?.grape || '';
-            const wineBottleSize = catalog?.bottle_size || line.bottle_size || null;
-            const wineWinery = catalog?.winery || line.producer || null;
+            if (!catalog) continue; // skip if no catalog entry could be resolved
 
-            // Check for existing stock entry (same company + name + vintage)
+            // Check for existing stock entry (same catalog + company + vintage)
             const existing = await tx.wine.findFirst({
-                where: { company_id, name: wineName, vintage }
+                where: { company_id, catalog_id: catalog.id, vintage }
             });
 
             let wineId;
@@ -208,7 +201,6 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                         purchase_price: purchasePrice || existing.purchase_price,
                         sell_price: sellPrice || existing.sell_price,
                         supplier: supplierName,
-                        winery: wineWinery || existing.winery
                     }
                 });
                 wineId = updated.id;
@@ -216,17 +208,9 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
             } else {
                 const created = await tx.wine.create({
                     data: {
-                        catalog_id: catalog?.id ?? null,
-                        name: wineName,
-                        type: wineType,
-                        region: wineRegion,
-                        subregion: wineSubregion,
-                        country: wineCountry,
+                        catalog_id: catalog.id,
                         vintage,
-                        grape: wineGrape,
-                        bottle_size: wineBottleSize,
                         supplier: supplierName,
-                        winery: wineWinery,
                         purchase_price: purchasePrice,
                         sell_price: sellPrice,
                         stock_count: quantity,
