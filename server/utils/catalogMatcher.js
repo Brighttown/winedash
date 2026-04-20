@@ -89,11 +89,12 @@ async function matchInventoryLine(line, company_id) {
     if (tokens.length === 0) return { matched: null, score: null, fromInventory: true };
 
     const ors = tokens.slice(0, 5).map(tok => ({
-        name: { contains: tok, mode: 'insensitive' }
+        catalog: { name: { contains: tok, mode: 'insensitive' } }
     }));
 
     const pool = await prisma.wine.findMany({
         where: { company_id, OR: ors },
+        include: { catalog: true },
         take: MAX_DB_CANDIDATES
     });
 
@@ -102,7 +103,7 @@ async function matchInventoryLine(line, company_id) {
     const fuse = new Fuse(pool, {
         includeScore: true,
         threshold: 0.7,
-        keys: [{ name: 'name', weight: 1.0 }]
+        keys: [{ name: 'catalog.name', weight: 1.0 }]
     });
 
     let results = fuse.search(line.name).slice(0, MAX_CANDIDATES);
@@ -118,8 +119,10 @@ async function matchInventoryLine(line, company_id) {
     }
 
     const best = results[0];
+    // Flatten catalog into the matched wine for downstream compatibility
+    const flattenMatch = (w) => w ? { ...w, name: w.catalog.name, type: w.catalog.type, region: w.catalog.region, country: w.catalog.country, winery: w.catalog.winery } : null;
     return {
-        matched: best && best.score <= MATCH_THRESHOLD ? best.item : null,
+        matched: best && best.score <= MATCH_THRESHOLD ? flattenMatch(best.item) : null,
         score: best ? best.score : null,
         fromInventory: true
     };
