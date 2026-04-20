@@ -93,7 +93,7 @@ async function matchInventoryLine(line, company_id) {
     }));
 
     const pool = await prisma.wine.findMany({
-        where: { company_id, OR: ors },
+        where: { company_id, catalog_id: { not: null }, OR: ors },
         include: { catalog: true },
         take: MAX_DB_CANDIDATES
     });
