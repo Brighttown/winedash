@@ -192,6 +192,7 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
             const wineCountry = catalog?.country || 'Onbekend';
             const wineGrape = catalog?.grape || '';
             const wineBottleSize = catalog?.bottle_size || line.bottle_size || null;
+            const wineWinery = catalog?.winery || line.producer || null;
 
             // Check for existing stock entry (same company + name + vintage)
             const existing = await tx.wine.findFirst({
@@ -206,7 +207,8 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                         stock_count: { increment: quantity },
                         purchase_price: purchasePrice || existing.purchase_price,
                         sell_price: sellPrice || existing.sell_price,
-                        supplier: supplierName
+                        supplier: supplierName,
+                        winery: wineWinery || existing.winery
                     }
                 });
                 wineId = updated.id;
@@ -223,6 +225,7 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                         grape: wineGrape,
                         bottle_size: wineBottleSize,
                         supplier: supplierName,
+                        winery: wineWinery,
                         purchase_price: purchasePrice,
                         sell_price: sellPrice,
                         stock_count: quantity,
