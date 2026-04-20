@@ -2,7 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import api from '../api/axios';
 import { toast } from 'react-hot-toast';
-import { UploadCloud, CheckCircle, AlertTriangle, Sparkles, Search, X, Save, Trash2, Loader2, Wine } from 'lucide-react';
+import {
+    UploadCloud, CheckCircle, AlertTriangle, Sparkles, Search, X,
+    Save, Trash2, Loader2, Wine, FileText, ChevronDown, ChevronUp
+} from 'lucide-react';
 
 const TYPE_OPTIONS = [
     { value: 'red', label: 'Rood' }, { value: 'white', label: 'Wit' },
@@ -24,10 +27,15 @@ const InputField = ({ label, value, onChange, type = 'text', step, options, clas
     </div>
 );
 
+// step: 'upload' | 'text' | 'review'
 const WijnkaartImportPage = () => {
     const [file, setFile] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [ready, setReady] = useState(false);
+    const [step, setStep] = useState('upload');
+    const [extractedText, setExtractedText] = useState('');
+    const [textChars, setTextChars] = useState(0);
+    const [textExpanded, setTextExpanded] = useState(false);
+    const [parsing, setParsing] = useState(false);
+    const [analyzing, setAnalyzing] = useState(false);
     const [restaurant, setRestaurant] = useState('');
     const [rows, setRows] = useState([]);
     const [saving, setSaving] = useState(false);
@@ -36,7 +44,7 @@ const WijnkaartImportPage = () => {
     const [searchResults, setSearchResults] = useState([]);
 
     const onDrop = useCallback(accepted => {
-        if (accepted?.length > 0) { setFile(accepted[0]); setReady(false); setRows([]); }
+        if (accepted?.length > 0) { setFile(accepted[0]); setStep('upload'); setRows([]); setExtractedText(''); }
     }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -52,17 +60,35 @@ const WijnkaartImportPage = () => {
         maxFiles: 1
     });
 
-    const handleExtract = async () => {
+    // Stap 1: bestand → tekst
+    const handleParse = async () => {
         if (!file) return;
-        setLoading(true);
-        const toastId = toast.loading('Wijnkaart verwerken… (kan even duren)', { duration: Infinity });
+        setParsing(true);
+        const toastId = toast.loading('Tekst extraheren uit bestand...', { duration: Infinity });
         const formData = new FormData();
         formData.append('file', file);
         try {
-            const { data } = await api.post('/wijnkaart/extract', formData, {
+            const { data } = await api.post('/wijnkaart/parse', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
-                timeout: 180000
+                timeout: 60000
             });
+            setExtractedText(data.text);
+            setTextChars(data.chars);
+            setStep('text');
+            toast.success(`Tekst gelezen: ${data.chars.toLocaleString('nl')} tekens`, { id: toastId });
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Fout bij lezen bestand.', { id: toastId });
+        } finally {
+            setParsing(false);
+        }
+    };
+
+    // Stap 2: tekst → AI → wijnen
+    const handleAnalyze = async () => {
+        setAnalyzing(true);
+        const toastId = toast.loading('AI analyseert wijnkaart… (kan even duren)', { duration: Infinity });
+        try {
+            const { data } = await api.post('/wijnkaart/analyze', { text: extractedText }, { timeout: 180000 });
             setRestaurant(data.restaurant || '');
             setRows(data.lines.map(line => ({
                 ...line,
@@ -77,6 +103,7 @@ const WijnkaartImportPage = () => {
                 },
                 overrides: {
                     sell_price: line.sell_price || '',
+                    per_glas: !!line.sell_price_glass,
                     sell_price_glass: line.sell_price_glass || '',
                     purchase_price: '',
                     vintage: line.vintage || '',
@@ -85,12 +112,12 @@ const WijnkaartImportPage = () => {
                 },
                 suggesting: false
             })));
-            setReady(true);
-            toast.success(`Wijnkaart gelezen: ${data.lines.length} wijnen`, { id: toastId });
+            setStep('review');
+            toast.success(`Klaar: ${data.lines.length} wijnen herkend`, { id: toastId });
         } catch (err) {
-            toast.error(err.response?.data?.error || 'Fout bij verwerken wijnkaart.', { id: toastId });
+            toast.error(err.response?.data?.error || 'Fout bij analyseren.', { id: toastId });
         } finally {
-            setLoading(false);
+            setAnalyzing(false);
         }
     };
 
@@ -143,6 +170,7 @@ const WijnkaartImportPage = () => {
                 const line = { name: r.name, producer: r.producer, vintage: r.vintage, type_hint: r.type_hint, quantity: 1, unit_price: 0 };
                 const wineOverrides = {
                     sell_price: r.overrides.sell_price !== '' ? Number(r.overrides.sell_price) : null,
+                    sell_price_glass: r.overrides.per_glas && r.overrides.sell_price_glass !== '' ? Number(r.overrides.sell_price_glass) : null,
                     purchase_price: r.overrides.purchase_price !== '' ? Number(r.overrides.purchase_price) : 0,
                     vintage: r.overrides.non_vintage ? null : (r.overrides.vintage ? Number(r.overrides.vintage) : null),
                     quantity: Number(r.overrides.quantity) || 0
@@ -155,7 +183,7 @@ const WijnkaartImportPage = () => {
 
             const { data } = await api.post('/invoice/confirm', { supplier: restaurant || 'Wijnkaart Import', decisions });
             toast.success(`Import klaar: ${data.createdWines} nieuw, ${data.updatedWines} bijgewerkt, ${data.createdCatalog} catalogus-entries`, { id: toastId });
-            setFile(null); setReady(false); setRows([]); setRestaurant('');
+            setFile(null); setStep('upload'); setRows([]); setRestaurant(''); setExtractedText('');
         } catch (err) {
             toast.error(err.response?.data?.error || 'Import mislukt.', { id: toastId });
         } finally {
@@ -163,6 +191,7 @@ const WijnkaartImportPage = () => {
         }
     };
 
+    const reset = () => { setFile(null); setStep('upload'); setRows([]); setRestaurant(''); setExtractedText(''); };
     const selectedCount = rows.filter(r => r.selected).length;
 
     return (
@@ -172,7 +201,25 @@ const WijnkaartImportPage = () => {
                 <p className="text-white/50">Upload een wijnkaart (PDF, Word of Excel). AI extraheert de wijnen inclusief verkoopprijs.</p>
             </div>
 
-            {!ready && (
+            {/* Stap indicator */}
+            <div className="flex items-center gap-2 text-sm">
+                {['upload', 'text', 'review'].map((s, idx) => {
+                    const labels = ['1. Upload', '2. Tekst controleren', '3. Wijnen bevestigen'];
+                    const active = step === s;
+                    const done = ['upload', 'text', 'review'].indexOf(step) > idx;
+                    return (
+                        <React.Fragment key={s}>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${active ? 'bg-[#7B2D3A] text-white' : done ? 'bg-green-600/40 text-green-300' : 'bg-white/10 text-white/30'}`}>
+                                {labels[idx]}
+                            </span>
+                            {idx < 2 && <span className="text-white/20">→</span>}
+                        </React.Fragment>
+                    );
+                })}
+            </div>
+
+            {/* ── Stap 1: Upload ── */}
+            {step === 'upload' && (
                 <div className="glass rounded-2xl shadow-xl p-6 space-y-4">
                     <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${isDragActive ? 'border-[#C4758A] bg-white/10' : 'border-white/20 hover:border-white/40 hover:bg-white/5'}`}>
                         <input {...getInputProps()} />
@@ -186,14 +233,51 @@ const WijnkaartImportPage = () => {
                             </>
                         )}
                     </div>
-                    <button onClick={handleExtract} disabled={!file || loading}
+                    <button onClick={handleParse} disabled={!file || parsing}
                         className="w-full py-3 bg-[#7B2D3A] text-white font-bold rounded-xl hover:bg-[#6A2433] disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10 transition-colors">
-                        <Wine size={18} /> {loading ? 'Bezig met analyseren...' : 'Analyseer wijnkaart met AI'}
+                        {parsing ? <><Loader2 size={18} className="animate-spin" /> Tekst lezen...</> : <><FileText size={18} /> Tekst extraheren</>}
                     </button>
                 </div>
             )}
 
-            {ready && (
+            {/* ── Stap 2: Tekst preview ── */}
+            {step === 'text' && (
+                <div className="glass rounded-2xl shadow-xl p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-bold text-white">Tekst geëxtraheerd</p>
+                            <p className="text-sm text-white/40">{textChars.toLocaleString('nl')} tekens · {file?.name}</p>
+                        </div>
+                        <CheckCircle size={24} className="text-green-400 shrink-0" />
+                    </div>
+
+                    <div>
+                        <button onClick={() => setTextExpanded(v => !v)}
+                            className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors mb-2">
+                            {textExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            {textExpanded ? 'Tekst verbergen' : 'Tekst bekijken'}
+                        </button>
+                        {textExpanded && (
+                            <pre className="bg-black/30 border border-white/10 rounded-xl p-4 text-xs text-white/60 max-h-64 overflow-y-auto whitespace-pre-wrap font-mono">
+                                {extractedText}
+                            </pre>
+                        )}
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button onClick={reset} className="px-4 py-3 border border-white/20 rounded-xl text-white/60 hover:bg-white/10 transition-colors flex items-center gap-1">
+                            <Trash2 size={16} /> Opnieuw
+                        </button>
+                        <button onClick={handleAnalyze} disabled={analyzing}
+                            className="flex-1 py-3 bg-[#7B2D3A] text-white font-bold rounded-xl hover:bg-[#6A2433] disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10 transition-colors">
+                            {analyzing ? <><Loader2 size={18} className="animate-spin" /> AI analyseert… (kan even duren)</> : <><Sparkles size={18} /> Analyseer met AI</>}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Stap 3: Review wijnen ── */}
+            {step === 'review' && (
                 <>
                     <div className="glass rounded-2xl shadow-xl p-5">
                         <div className="flex items-center justify-between gap-4">
@@ -274,10 +358,26 @@ const WijnkaartImportPage = () => {
                                                 </>
                                             )}
 
-                                            {/* Verkoopprijs + overige velden */}
+                                            {/* Prijs + overige velden */}
                                             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                                                 <InputField label="Verkoop fles (€)" value={row.overrides.sell_price} onChange={v => updateOverride(i, { sell_price: v })} type="number" step="0.01" placeholder="0.00" />
-                                                <InputField label="Verkoop glas (€)" value={row.overrides.sell_price_glass} onChange={v => updateOverride(i, { sell_price_glass: v })} type="number" step="0.01" placeholder="optioneel" />
+
+                                                {/* Per glas */}
+                                                <div>
+                                                    <label className="flex items-center gap-1.5 mb-1 cursor-pointer select-none">
+                                                        <input type="checkbox" checked={!!row.overrides.per_glas}
+                                                            onChange={e => updateOverride(i, { per_glas: e.target.checked, sell_price_glass: e.target.checked ? row.overrides.sell_price_glass : '' })}
+                                                            className="w-3.5 h-3.5 accent-[#7B2D3A]" />
+                                                        <span className="text-[10px] font-semibold text-white/40 uppercase tracking-wide">Per glas</span>
+                                                    </label>
+                                                    <input type="number" step="0.01"
+                                                        value={row.overrides.per_glas ? (row.overrides.sell_price_glass ?? '') : ''}
+                                                        onChange={e => updateOverride(i, { sell_price_glass: e.target.value })}
+                                                        disabled={!row.overrides.per_glas}
+                                                        placeholder={row.overrides.per_glas ? '0.00' : '—'}
+                                                        className="input-glass py-1.5 px-2 text-sm disabled:opacity-30" />
+                                                </div>
+
                                                 <InputField label="Inkoop (€)" value={row.overrides.purchase_price} onChange={v => updateOverride(i, { purchase_price: v })} type="number" step="0.01" placeholder="optioneel" />
                                                 <div>
                                                     <InputField label="Jaar" value={row.overrides.non_vintage ? '' : row.overrides.vintage} onChange={v => updateOverride(i, { vintage: v })} type="number" disabled={row.overrides.non_vintage} placeholder={row.overrides.non_vintage ? 'NV' : ''} />
@@ -303,8 +403,7 @@ const WijnkaartImportPage = () => {
                     </div>
 
                     <div className="flex gap-3">
-                        <button onClick={() => { setReady(false); setRows([]); setFile(null); }}
-                            className="px-4 py-3 border border-white/20 rounded-xl text-white/60 hover:bg-white/10 transition-colors flex items-center gap-1">
+                        <button onClick={reset} className="px-4 py-3 border border-white/20 rounded-xl text-white/60 hover:bg-white/10 transition-colors flex items-center gap-1">
                             <Trash2 size={16} /> Annuleer
                         </button>
                         <button onClick={handleConfirm} disabled={saving || selectedCount === 0}
@@ -315,6 +414,7 @@ const WijnkaartImportPage = () => {
                 </>
             )}
 
+            {/* Search modal */}
             {searchingIndex != null && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setSearchingIndex(null)}>
                     <div className="glass rounded-2xl shadow-2xl max-w-xl w-full max-h-[80vh] flex flex-col border border-white/15" onClick={e => e.stopPropagation()}>

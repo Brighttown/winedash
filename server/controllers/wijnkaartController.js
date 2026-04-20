@@ -139,32 +139,40 @@ async function extractWijnkaart(text) {
     return { restaurant, lines: allLines };
 }
 
-export const extractWijnkaartHandler = asyncHandler(async (req, res) => {
+/** Stap 1: bestand → ruwe tekst */
+export const parseTextHandler = asyncHandler(async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Geen bestand geüpload' });
-    const { company_id } = req.user;
-
     try {
         const text = await parseWijnkaartFile(req.file.path, req.file.originalname);
         console.log('[wijnkaart] Tekst extracted:', text.slice(0, 200));
-
         if (!text || text.trim().length < 20) {
             return res.status(422).json({ error: 'Kon geen tekst lezen uit het bestand.' });
         }
-
-        const extracted = await extractWijnkaart(text);
-        console.log('[wijnkaart] LLM extractie:', extracted.lines.length, 'wijnen');
-
-        const lines = extracted.lines;
-        const catalogMatches = await matchLines(lines);
-        const inventoryMatches = await matchInventoryLines(lines, company_id);
-
-        const enrichedLines = lines.map((line, i) => ({
-            ...line,
-            match: catalogMatches[i].matched ? catalogMatches[i] : inventoryMatches[i]
-        }));
-
-        res.json({ restaurant: extracted.restaurant, lines: enrichedLines });
+        res.json({ text, chars: text.length });
     } finally {
         if (req.file) await fs.unlink(req.file.path).catch(() => {});
     }
+});
+
+/** Stap 2: tekst → AI → gematche wijnlijst */
+export const analyzeHandler = asyncHandler(async (req, res) => {
+    const { text } = req.body;
+    const { company_id } = req.user;
+    if (!text || text.trim().length < 20) {
+        return res.status(400).json({ error: 'Geen tekst om te analyseren.' });
+    }
+
+    const extracted = await extractWijnkaart(text);
+    console.log('[wijnkaart] LLM extractie:', extracted.lines.length, 'wijnen');
+
+    const lines = extracted.lines;
+    const catalogMatches = await matchLines(lines);
+    const inventoryMatches = await matchInventoryLines(lines, company_id);
+
+    const enrichedLines = lines.map((line, i) => ({
+        ...line,
+        match: catalogMatches[i].matched ? catalogMatches[i] : inventoryMatches[i]
+    }));
+
+    res.json({ restaurant: extracted.restaurant, lines: enrichedLines });
 });
