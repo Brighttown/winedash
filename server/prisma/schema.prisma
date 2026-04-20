@@ -43,6 +43,7 @@ model Wine {
   type             String   // red/white/rose/sparkling
   bottle_size      String?
   supplier         String?
+  winery           String?
   purchase_price   Float
   sell_price       Float?
   stock_count      Int      @default(0)

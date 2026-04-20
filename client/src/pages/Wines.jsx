@@ -14,7 +14,7 @@ const Wines = () => {
     const [mutationsWine, setMutationsWine] = useState(null);
     const [formData, setFormData] = useState({
         name: '', region: '', country: '', vintage: '', grape: '', type: 'red',
-        supplier: '', purchase_price: 0, sell_price: 0, stock_count: 0, min_stock_alert: 0
+        supplier: '', winery: '', purchase_price: 0, sell_price: 0, stock_count: 0, min_stock_alert: 0
     });
     const [editId, setEditId] = useState(null);
     const navigate = useNavigate();
@@ -82,14 +82,14 @@ const Wines = () => {
 
     const openAddModal = () => {
         setEditId(null);
-        setFormData({ name: '', region: '', country: '', vintage: new Date().getFullYear(), grape: '', type: 'red', supplier: '', purchase_price: 0, sell_price: 0, stock_count: 0, min_stock_alert: 5 });
+        setFormData({ name: '', region: '', country: '', vintage: new Date().getFullYear(), grape: '', type: 'red', supplier: '', winery: '', purchase_price: 0, sell_price: 0, stock_count: 0, min_stock_alert: 5 });
         setIsModalOpen(true);
     };
 
     const openEditModal = (wine, e) => {
         e.stopPropagation();
         setEditId(wine.id);
-        setFormData({ ...wine });
+        setFormData({ ...wine, winery: wine.winery ?? '' });
         setIsModalOpen(true);
     };
 
@@ -229,10 +229,11 @@ const Wines = () => {
                                     { label: 'Jaargang', key: 'vintage', type: 'number' },
                                     { label: 'Druivensoort', key: 'grape', type: 'text' },
                                     { label: 'Leverancier', key: 'supplier', type: 'text' },
+                                    { label: 'Wijnhuis', key: 'winery', type: 'text' },
                                 ].map(f => (
                                     <div key={f.key}>
                                         <label className={labelClass}>{f.label}</label>
-                                        <input required={f.required} type={f.type} value={formData[f.key]} onChange={e => setFormData({ ...formData, [f.key]: e.target.value })} className="input-glass" />
+                                        <input required={f.required} type={f.type} value={formData[f.key] ?? ''} onChange={e => setFormData({ ...formData, [f.key]: e.target.value })} className="input-glass" />
                                     </div>
                                 ))}
                                 <div>

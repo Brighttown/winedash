@@ -11,6 +11,7 @@ const wineSchema = z.object({
     vintage: z.number().int().min(1800).max(new Date().getFullYear() + 1).optional().nullable(),
     grape: z.string().max(200).optional(),
     supplier: z.string().max(200).optional(),
+    winery: z.string().max(200).optional().nullable(),
     purchase_price: z.number().min(0).optional(),
     sell_price: z.number().min(0).optional(),
     stock_count: z.number().int().min(0).optional(),
