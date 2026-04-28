@@ -91,6 +91,8 @@ const RuleEditor = ({ rule, onChange, onDelete }) => {
     const isType = rule.field === 'type';
     const isNumeric = rule.field === 'vintage' || rule.field === 'sell_price';
 
+    const optStyle = { background: '#1B4332', color: 'white' };
+
     return (
         <div className="flex flex-wrap items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs">
             <select
@@ -98,14 +100,14 @@ const RuleEditor = ({ rule, onChange, onDelete }) => {
                 onChange={e => onChange({ ...rule, field: e.target.value, value: '' })}
                 className="bg-white/10 border border-white/15 rounded px-1.5 py-1 text-white outline-none"
             >
-                {RULE_FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                {RULE_FIELDS.map(f => <option key={f.value} value={f.value} style={optStyle}>{f.label}</option>)}
             </select>
             <select
                 value={rule.op}
                 onChange={e => onChange({ ...rule, op: e.target.value })}
                 className="bg-white/10 border border-white/15 rounded px-1.5 py-1 text-white outline-none"
             >
-                {RULE_OPS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
+                {RULE_OPS.map(op => <option key={op.value} value={op.value} style={optStyle}>{op.label}</option>)}
             </select>
             {isType ? (
                 <select
@@ -113,8 +115,8 @@ const RuleEditor = ({ rule, onChange, onDelete }) => {
                     onChange={e => onChange({ ...rule, value: e.target.value })}
                     className="bg-white/10 border border-white/15 rounded px-1.5 py-1 text-white outline-none"
                 >
-                    <option value="">—</option>
-                    {TYPE_OPTIONS.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
+                    <option value="" style={optStyle}>—</option>
+                    {TYPE_OPTIONS.map(t => <option key={t} value={t} style={optStyle}>{TYPE_LABELS[t]}</option>)}
                 </select>
             ) : (
                 <input
@@ -186,7 +188,7 @@ const GroupCard = ({ group, depth, parentId, onUpdate, onDelete, onAddChild, pre
                         className="shrink-0 bg-white/10 border border-white/15 rounded px-1.5 py-1 text-white text-xs outline-none"
                         title="Sortering"
                     >
-                        {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        {SORT_OPTIONS.map(s => <option key={s.value} value={s.value} style={{ background: '#1B4332', color: 'white' }}>{s.label}</option>)}
                     </select>
                     <button
                         onClick={() => onAddChild(group.id)}
