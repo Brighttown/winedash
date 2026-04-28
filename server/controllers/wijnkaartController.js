@@ -94,49 +94,72 @@ async function extractWijnkaart(text) {
     if (!text || text.trim().length < 10) return { restaurant: '', lines: [] };
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY niet ingesteld');
+    if (!apiKey) {
+        const e = new Error('AI-extractie niet beschikbaar: ANTHROPIC_API_KEY ontbreekt op de server.');
+        e.status = 503;
+        e.expose = true;
+        throw e;
+    }
     const client = new Anthropic({ apiKey });
 
     const chunks = splitIntoChunks(text, CHUNK_SIZE).slice(0, MAX_CHUNKS);
     let restaurant = '';
     const allLines = [];
     const seen = new Set();
+    const chunkErrors = [];
 
     for (let i = 0; i < chunks.length; i++) {
-        const response = await client.messages.create({
-            model: MODEL,
-            max_tokens: 4096,
-            tools: [WIJNKAART_TOOL],
-            tool_choice: { type: 'tool', name: 'record_wijnkaart' },
-            messages: [{
-                role: 'user',
-                content:
-                    `Dit is deel ${i + 1} van ${chunks.length} van een restaurantwijnkaart of wijnlijst. ` +
-                    'Extraheer ELKE wijn met naam, producent, jaargang en verkoopprijs. ' +
-                    'Vul het jaargang ALLEEN in als het expliciet vermeld staat. ' +
-                    'De verkoopprijs is de prijs die gasten betalen (niet de inkoopprijs). ' +
-                    'Negeer kopteksten, categorie-labels en tekst die geen echte wijn is. ' +
-                    'Leid het wijntype af uit sectie-headers (bijv. "Rode Wijnen" → red, "Blanc" → white).\n\n' +
-                    '--- TEKST ---\n' + chunks[i]
-            }]
-        });
+        try {
+            const response = await client.messages.create({
+                model: MODEL,
+                max_tokens: 4096,
+                tools: [WIJNKAART_TOOL],
+                tool_choice: { type: 'tool', name: 'record_wijnkaart' },
+                messages: [{
+                    role: 'user',
+                    content:
+                        `Dit is deel ${i + 1} van ${chunks.length} van een restaurantwijnkaart of wijnlijst. ` +
+                        'Extraheer ELKE wijn met naam, producent, jaargang en verkoopprijs. ' +
+                        'Vul het jaargang ALLEEN in als het expliciet vermeld staat. ' +
+                        'De verkoopprijs is de prijs die gasten betalen (niet de inkoopprijs). ' +
+                        'Negeer kopteksten, categorie-labels en tekst die geen echte wijn is. ' +
+                        'Leid het wijntype af uit sectie-headers (bijv. "Rode Wijnen" → red, "Blanc" → white).\n\n' +
+                        '--- TEKST ---\n' + chunks[i]
+                }]
+            });
 
-        const toolUse = response.content.find(b => b.type === 'tool_use');
-        if (!toolUse) continue;
-        if (i === 0 && toolUse.input.restaurant) restaurant = toolUse.input.restaurant;
+            const toolUse = response.content.find(b => b.type === 'tool_use');
+            if (!toolUse) {
+                console.warn(`[wijnkaart] chunk ${i + 1}/${chunks.length}: geen tool_use in response`);
+                continue;
+            }
+            if (i === 0 && toolUse.input.restaurant) restaurant = toolUse.input.restaurant;
 
-        for (const line of (toolUse.input.lines || [])) {
-            if (!line.name || line.name.length < 2) continue;
-            const key = `${line.name.toLowerCase().trim()}|${line.vintage || ''}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            allLines.push(line);
+            for (const line of (toolUse.input.lines || [])) {
+                if (!line.name || line.name.length < 2) continue;
+                const key = `${line.name.toLowerCase().trim()}|${line.vintage || ''}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                allLines.push(line);
+            }
+        } catch (err) {
+            const msg = err?.error?.error?.message || err?.message || String(err);
+            console.error(`[wijnkaart] chunk ${i + 1}/${chunks.length} mislukt:`, msg);
+            chunkErrors.push(`chunk ${i + 1}: ${msg}`);
         }
 
         if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 1500));
     }
 
-    return { restaurant, lines: allLines };
+    // Als ALLE chunks faalden, geef een echte fout terug
+    if (allLines.length === 0 && chunkErrors.length === chunks.length) {
+        const e = new Error(`AI-extractie mislukt voor alle delen: ${chunkErrors[0]}`);
+        e.status = 502;
+        e.expose = true;
+        throw e;
+    }
+
+    return { restaurant, lines: allLines, partialError: chunkErrors.length > 0 ? chunkErrors[0] : null };
 }
 
 /** Stap 1: bestand → ruwe tekst */

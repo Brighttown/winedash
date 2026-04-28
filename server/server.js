@@ -109,8 +109,10 @@ app.use((err, req, res, next) => {
     }
 
     const isProd = process.env.NODE_ENV === 'production';
+    // Errors with an explicit `status` are deliberate — show their message even in prod.
+    const exposeMessage = !isProd || (err.status && err.status < 500) || err.expose === true;
     res.status(err.status || 500).json({
-        error: isProd ? 'Er is een serverfout opgetreden.' : err.message,
+        error: exposeMessage ? err.message : 'Er is een serverfout opgetreden.',
     });
 });
 
