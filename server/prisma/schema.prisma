@@ -29,7 +29,19 @@ model Company {
   user_id         String
   user            User     @relation(fields: [user_id], references: [id])
 
-  wines           Wine[]
+  wines              Wine[]
+  exportTemplates    WineExportTemplate[]
+}
+
+model WineExportTemplate {
+  id          String   @id @default(uuid())
+  company_id  String
+  company     Company  @relation(fields: [company_id], references: [id])
+  name        String
+  title       String   @default("Wijnkaart")
+  structure   Json     // { groups: [ { id, name, rules, sort, children } ] }
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 }
 
 model Wine {

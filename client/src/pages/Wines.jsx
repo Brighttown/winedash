@@ -85,20 +85,7 @@ const Wines = () => {
         }
     };
 
-    const handleGeneratePDF = async () => {
-        try {
-            const toastId = toast.loading('PDF wordt gegenereerd...');
-            const response = await api.post('/pdf/winelist', {}, { responseType: 'blob' });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `wijnkaart-${new Date().toISOString().split('T')[0]}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-            toast.success('PDF succesvol gedownload!', { id: toastId });
-        } catch { toast.error('Fout bij maken PDF'); }
-    };
+    const handleGeneratePDF = () => navigate('/wijnkaart-export');
 
     const handleDelete = async (id) => {
         if (!window.confirm('Weet je zeker dat je deze wijn wilt verwijderen?')) return;

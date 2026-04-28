@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Wine, Upload, LogOut, Database, FileSpreadsheet,
     Users, ShieldCheck, CheckSquare, Sparkles, Plus, X,
-    Package, BookOpen, ScrollText
+    Package, BookOpen, ScrollText, FileDown
 } from 'lucide-react';
 
 const Layout = () => {
@@ -149,6 +149,10 @@ const Layout = () => {
                                 <NavLink to="/wijnkaart-import" className={navClass}>
                                     <ScrollText size={18} className="shrink-0" />
                                     <span>Wijnkaart Import</span>
+                                </NavLink>
+                                <NavLink to="/wijnkaart-export" className={navClass}>
+                                    <FileDown size={18} className="shrink-0" />
+                                    <span>Wijnkaart Export</span>
                                 </NavLink>
                             </>
                         )}
