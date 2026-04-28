@@ -46,6 +46,41 @@ const SORT_OPTIONS = [
 const TYPE_OPTIONS = ['red', 'white', 'rose', 'sparkling', 'dessert'];
 const TYPE_LABELS = { red: 'Rood', white: 'Wit', rose: 'Rosé', sparkling: 'Bubbels', dessert: 'Dessert' };
 
+const FORMAT_TOKENS = [
+    { key: 'name', label: 'Naam' },
+    { key: 'vintage', label: 'Jaargang' },
+    { key: 'winery', label: 'Wijnhuis' },
+    { key: 'region', label: 'Regio' },
+    { key: 'subregion', label: 'Subregio' },
+    { key: 'country', label: 'Land' },
+    { key: 'grape', label: 'Druif' },
+    { key: 'type', label: 'Type' },
+    { key: 'sell_price', label: 'Prijs' },
+];
+
+const TOKEN_RESOLVERS = {
+    name: w => w.name,
+    vintage: w => w.vintage,
+    winery: w => w.winery,
+    region: w => w.region,
+    subregion: w => w.subregion,
+    country: w => w.country,
+    grape: w => w.grape,
+    type: w => TYPE_LABELS[w.type] || w.type,
+    sell_price: w => w.sell_price != null ? `€ ${Number(w.sell_price).toFixed(2)}` : '',
+};
+
+const formatWineLine = (template, wine) => {
+    if (!template) return '';
+    let out = template.replace(/\[(\w+)\]/g, (_, key) => {
+        const fn = TOKEN_RESOLVERS[key];
+        if (!fn) return ' ';
+        const v = fn(wine);
+        return v === null || v === undefined || v === '' ? ' ' : String(v);
+    });
+    return out.replace(/\s+/g, ' ').trim();
+};
+
 const uid = () => Math.random().toString(36).slice(2, 11);
 
 const newGroup = (name = 'Nieuwe groep') => ({
@@ -280,7 +315,7 @@ const SortableLevel = ({ groups, parentId, depth, onUpdate, onDelete, onAddChild
 
 // ────────────────────────────────────────────────────────────────────────────
 
-const PreviewTree = ({ tree, depth = 0 }) => {
+const PreviewTree = ({ tree, depth = 0, wineFormat }) => {
     if (!tree || tree.length === 0) return <p className="text-white/30 italic text-sm">Geen groepen.</p>;
     return (
         <div className="space-y-2">
@@ -291,20 +326,27 @@ const PreviewTree = ({ tree, depth = 0 }) => {
                     </p>
                     {node.wines.length > 0 && (
                         <ul className="space-y-0.5 text-xs">
-                            {node.wines.map(w => (
-                                <li key={w.id} className="flex justify-between gap-2 text-white/70">
-                                    <span className="truncate">
-                                        {w.name}{w.vintage ? ` (${w.vintage})` : ''}
-                                        {w.winery && <span className="text-white/30"> · {w.winery}</span>}
-                                    </span>
-                                    <span className="shrink-0 text-white/50 font-medium">
-                                        {w.sell_price != null ? `€ ${Number(w.sell_price).toFixed(2)}` : '—'}
-                                    </span>
-                                </li>
-                            ))}
+                            {node.wines.map(w => {
+                                const customLine = wineFormat?.trim() ? formatWineLine(wineFormat, w) : null;
+                                return (
+                                    <li key={w.id} className="flex justify-between gap-2 text-white/70">
+                                        <span className="truncate">
+                                            {customLine || (
+                                                <>
+                                                    {w.name}{w.vintage ? ` (${w.vintage})` : ''}
+                                                    {w.winery && <span className="text-white/30"> · {w.winery}</span>}
+                                                </>
+                                            )}
+                                        </span>
+                                        <span className="shrink-0 text-white/50 font-medium">
+                                            {w.sell_price != null ? `€ ${Number(w.sell_price).toFixed(2)}` : '—'}
+                                        </span>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
-                    {node.children.length > 0 && <PreviewTree tree={node.children} depth={depth + 1} />}
+                    {node.children.length > 0 && <PreviewTree tree={node.children} depth={depth + 1} wineFormat={wineFormat} />}
                 </div>
             ))}
         </div>
@@ -322,10 +364,11 @@ const WijnExportPage = () => {
         { ...newGroup('Rode wijnen'), rules: [{ field: 'type', op: 'equals', value: 'red' }] },
         { ...newGroup('Witte wijnen'), rules: [{ field: 'type', op: 'equals', value: 'white' }] },
     ]);
+    const [wineFormat, setWineFormat] = useState('[name] · [region] · [grape]');
     const [previewTree, setPreviewTree] = useState(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
-    const structure = useMemo(() => ({ groups }), [groups]);
+    const structure = useMemo(() => ({ groups, wineFormat }), [groups, wineFormat]);
 
     const fetchTemplates = useCallback(async () => {
         try {
@@ -381,6 +424,7 @@ const WijnExportPage = () => {
             setName(data.name);
             setTitle(data.title || 'Wijnkaart');
             setGroups(data.structure?.groups || []);
+            setWineFormat(data.structure?.wineFormat ?? '[name] · [region] · [grape]');
             toast.success('Template geladen');
         } catch { toast.error('Kan template niet laden'); }
     };
@@ -405,6 +449,7 @@ const WijnExportPage = () => {
         setName('Nieuwe wijnkaart');
         setTitle('Wijnkaart');
         setGroups([newGroup('Rode wijnen')]);
+        setWineFormat('[name] · [region] · [grape]');
     };
 
     const deleteTemplate = async () => {
@@ -482,6 +527,31 @@ const WijnExportPage = () => {
                 </div>
             </div>
 
+            <div className="glass rounded-2xl shadow-xl p-4">
+                <label className="text-xs font-bold uppercase tracking-wider text-white/40 mb-2 block">Wijn-notatie per regel</label>
+                <input
+                    value={wineFormat}
+                    onChange={e => setWineFormat(e.target.value)}
+                    placeholder="bv. [name] [region] [grape]"
+                    className="input-glass text-sm font-mono"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                    {FORMAT_TOKENS.map(t => (
+                        <button
+                            key={t.key}
+                            onClick={() => setWineFormat(f => `${f}${f && !f.endsWith(' ') ? ' ' : ''}[${t.key}]`)}
+                            className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/15 text-white/70 hover:bg-white/10 hover:text-white transition-colors font-mono"
+                            title={t.label}
+                        >
+                            [{t.key}]
+                        </button>
+                    ))}
+                </div>
+                <p className="text-[11px] text-white/30 mt-2">
+                    Tokens worden bij export vervangen door wijnwaarden. Lege velden worden weggelaten.
+                </p>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                 {/* Editor */}
                 <div className="lg:col-span-3 glass rounded-2xl shadow-xl p-4">
@@ -518,7 +588,7 @@ const WijnExportPage = () => {
                     {previewLoading && !previewTree ? (
                         <div className="text-center py-8"><div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto" /></div>
                     ) : (
-                        <PreviewTree tree={previewTree || []} />
+                        <PreviewTree tree={previewTree || []} wineFormat={wineFormat} />
                     )}
                 </div>
             </div>

@@ -118,6 +118,8 @@ export const generatePdf = asyncHandler(async (req, res) => {
     let title = 'Wijnkaart';
     let structure;
 
+    let wineFormat = '';
+
     if (req.body?.template_id) {
         const t = await prisma.wineExportTemplate.findFirst({
             where: { id: req.body.template_id, company_id },
@@ -125,11 +127,13 @@ export const generatePdf = asyncHandler(async (req, res) => {
         if (!t) return res.status(404).json({ error: 'Template niet gevonden' });
         title = t.title || t.name;
         structure = t.structure;
+        wineFormat = t.structure?.wineFormat || '';
     } else {
         const err = validateStructure(req.body?.structure);
         if (err) return res.status(400).json({ error: err });
         structure = req.body.structure;
         title = req.body.title || 'Wijnkaart';
+        wineFormat = req.body.wineFormat || structure?.wineFormat || '';
     }
 
     const company = await prisma.company.findUnique({ where: { id: company_id } });
@@ -140,5 +144,5 @@ export const generatePdf = asyncHandler(async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}.pdf"`);
 
-    renderExportPdf(res, { title, tree, companyName: company?.name });
+    renderExportPdf(res, { title, tree, companyName: company?.name, wineFormat });
 });
