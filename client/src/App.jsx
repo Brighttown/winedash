@@ -14,6 +14,7 @@ import AdminUsers from './pages/AdminUsers';
 import AdminApproval from './pages/AdminApproval';
 import WijnkaartImportPage from './pages/WijnkaartImportPage';
 import WijnExportPage from './pages/WijnExportPage';
+import Transactions from './pages/Transactions';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -42,6 +43,7 @@ function App() {
           <Route path="catalog/:id" element={<CatalogDetail />} />
           {/* User routes */}
           <Route path="wines" element={<Wines />} />
+          <Route path="transactions" element={<Transactions />} />
           <Route path="upload" element={<UploadPage />} />
           <Route path="invoice-import" element={<InvoiceImportPage />} />
           <Route path="excel-import" element={<ExcelImport />} />

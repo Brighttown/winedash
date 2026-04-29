@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, Wine, Upload, LogOut, Database, FileSpreadsheet,
     Users, ShieldCheck, CheckSquare, Sparkles, Plus, X,
-    Package, BookOpen, ScrollText, FileDown
+    Package, BookOpen, ScrollText, FileDown, Receipt
 } from 'lucide-react';
 
 const Layout = () => {
@@ -131,6 +131,10 @@ const Layout = () => {
                                 <NavLink to="/catalog" className={navClass}>
                                     <BookOpen size={18} className="shrink-0" />
                                     <span>Wijn Catalogus</span>
+                                </NavLink>
+                                <NavLink to="/transactions" className={navClass}>
+                                    <Receipt size={18} className="shrink-0" />
+                                    <span>Transacties</span>
                                 </NavLink>
 
                                 <SectionLabel>Facturen & Import</SectionLabel>
