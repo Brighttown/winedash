@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-    LayoutDashboard, Wine, Upload, LogOut, Database, FileSpreadsheet,
+    LayoutDashboard, Wine, LogOut, Database, FileSpreadsheet,
     Users, ShieldCheck, CheckSquare, Sparkles, Plus, X,
     Package, BookOpen, ScrollText, FileDown, Receipt
 } from 'lucide-react';
@@ -138,18 +138,16 @@ const Layout = () => {
                                 </NavLink>
 
                                 <SectionLabel>Facturen & Import</SectionLabel>
-                                <NavLink to="/upload" className={navClass}>
-                                    <Upload size={18} className="shrink-0" />
-                                    <span>Facturen uploaden</span>
-                                </NavLink>
                                 <NavLink to="/invoice-import" className={navClass}>
                                     <Sparkles size={18} className="shrink-0" />
                                     <span>Factuur via AI</span>
                                 </NavLink>
                                 <NavLink to="/excel-import" className={navClass}>
                                     <FileSpreadsheet size={18} className="shrink-0" />
-                                    <span>Excel Import</span>
+                                    <span>Voorraad importeren</span>
                                 </NavLink>
+
+                                <SectionLabel>Wijnkaarten</SectionLabel>
                                 <NavLink to="/wijnkaart-import" className={navClass}>
                                     <ScrollText size={18} className="shrink-0" />
                                     <span>Wijnkaart Import</span>
@@ -284,17 +282,13 @@ const Layout = () => {
                                     </>
                                 ) : (
                                     <>
-                                        <button onClick={() => { navigate('/upload'); setAddMenuOpen(false); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-white/10 transition-colors text-left">
-                                            <div className="w-10 h-10 rounded-full bg-[#1B4332]/80 border border-white/10 flex items-center justify-center shrink-0"><Upload size={20} className="text-green-300" /></div>
-                                            <div><p className="text-sm font-semibold text-white">Facturen</p><p className="text-xs text-white/40">Upload factuur handmatig</p></div>
-                                        </button>
                                         <button onClick={() => { navigate('/invoice-import'); setAddMenuOpen(false); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-white/10 transition-colors text-left">
                                             <div className="w-10 h-10 rounded-full bg-[#7B2D3A]/50 border border-white/10 flex items-center justify-center shrink-0"><Sparkles size={20} className="text-[#C4758A]" /></div>
                                             <div><p className="text-sm font-semibold text-white">Factuur AI</p><p className="text-xs text-white/40">Automatisch herkennen via AI</p></div>
                                         </button>
                                         <button onClick={() => { navigate('/excel-import'); setAddMenuOpen(false); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-white/10 transition-colors text-left">
                                             <div className="w-10 h-10 rounded-full bg-[#1B4332]/80 border border-white/10 flex items-center justify-center shrink-0"><FileSpreadsheet size={20} className="text-green-300" /></div>
-                                            <div><p className="text-sm font-semibold text-white">Excel Import</p><p className="text-xs text-white/40">Importeer via spreadsheet</p></div>
+                                            <div><p className="text-sm font-semibold text-white">Voorraad importeren</p><p className="text-xs text-white/40">Importeer via spreadsheet</p></div>
                                         </button>
                                         <button onClick={() => { navigate('/wijnkaart-import'); setAddMenuOpen(false); }} className="flex items-center gap-3 w-full px-3 py-3 rounded-xl hover:bg-white/10 transition-colors text-left">
                                             <div className="w-10 h-10 rounded-full bg-[#7B2D3A]/50 border border-white/10 flex items-center justify-center shrink-0"><ScrollText size={20} className="text-[#C4758A]" /></div>
