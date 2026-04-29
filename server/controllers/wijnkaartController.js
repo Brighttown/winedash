@@ -71,11 +71,13 @@ const WIJNKAART_TOOL = {
 };
 
 const MODEL = 'claude-haiku-4-5-20251001';
-const TARGET_CHUNK_SIZE = 2200;
-const MAX_CHUNK_SIZE = 3500;
-const MAX_CHUNKS = 80;
-const MAX_PARALLEL = 8;
-const MAX_OUTPUT_TOKENS = 8192;
+const TARGET_CHUNK_SIZE = 1500;
+const MAX_CHUNK_SIZE = 2400;
+const MAX_CHUNKS = 100;
+const MAX_PARALLEL = 1; // serieel; rate limit van 4k output tokens/min staat parallellisme niet toe
+const MAX_OUTPUT_TOKENS = 3500; // onder de 4000/min budget zodat een call niet upfront geweigerd wordt
+const PACING_MS = 16000; // ~3.7 calls/min, blijft onder 4k output- en 10k input-budget per minuut
+const MAX_RETRIES = 4;
 
 // ─── Section-aware adaptive chunking ──────────────────────────────────────────
 
@@ -131,19 +133,49 @@ function buildAdaptiveChunks(text, target = TARGET_CHUNK_SIZE, max = MAX_CHUNK_S
 
 // ─── AI extractie per chunk ───────────────────────────────────────────────────
 
-/** Map met concurrency-limiet — voorkomt 429s bij grote wijnkaarten. */
-async function mapWithConcurrency(items, limit, fn) {
+/** Map met concurrency-limiet en optionele pacing — voorkomt 429s bij grote wijnkaarten. */
+async function mapWithConcurrency(items, limit, fn, pacingMs = 0) {
     const results = new Array(items.length);
     let cursor = 0;
+    let lastStart = 0;
     const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
         while (true) {
             const i = cursor++;
             if (i >= items.length) return;
+            if (pacingMs > 0) {
+                const wait = lastStart + pacingMs - Date.now();
+                if (wait > 0) await new Promise(r => setTimeout(r, wait));
+                lastStart = Date.now();
+            }
             results[i] = await fn(items[i], i);
         }
     });
     await Promise.all(workers);
     return results;
+}
+
+/** Retry op 429 met respect voor retry-after header. */
+async function withRateLimitRetry(fn, label) {
+    let lastErr = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            return await fn();
+        } catch (err) {
+            const status = err?.status || err?.response?.status;
+            const is429 = status === 429 || /rate limit/i.test(err?.message || '');
+            if (!is429 || attempt === MAX_RETRIES) {
+                lastErr = err;
+                break;
+            }
+            const headerWait = Number(err?.headers?.['retry-after'] || err?.response?.headers?.['retry-after']);
+            const waitMs = Number.isFinite(headerWait) && headerWait > 0
+                ? headerWait * 1000
+                : Math.min(60000, 2000 * Math.pow(2, attempt));
+            console.warn(`[wijnkaart] ${label}: 429 — wacht ${Math.round(waitMs / 1000)}s en retry (poging ${attempt + 1}/${MAX_RETRIES})`);
+            await new Promise(r => setTimeout(r, waitMs));
+        }
+    }
+    throw lastErr;
 }
 
 function buildAnthropicClient() {
@@ -161,7 +193,7 @@ async function extractChunk(client, chunk, index, total) {
     const headerNote = chunk.header
         ? `Deze sectie staat onder de header: "${chunk.header}". Gebruik dit om type_hint te bepalen.\n\n`
         : '';
-    const response = await client.messages.create({
+    const response = await withRateLimitRetry(() => client.messages.create({
         model: MODEL,
         max_tokens: MAX_OUTPUT_TOKENS,
         tools: [WIJNKAART_TOOL],
@@ -178,7 +210,7 @@ async function extractChunk(client, chunk, index, total) {
                 headerNote +
                 '--- TEKST ---\n' + chunk.body
         }]
-    });
+    }), `chunk ${index + 1}/${total}`);
     const toolUse = response.content.find(b => b.type === 'tool_use');
     if (!toolUse) {
         console.warn(`[wijnkaart] chunk ${index + 1}/${total}: geen tool_use (stop_reason=${response.stop_reason})`);
@@ -245,7 +277,7 @@ export const analyzeStreamHandler = asyncHandler(async (req, res) => {
     let restaurant = '';
     let chunkErrors = 0;
 
-    // Chunks parallel met concurrency-limiet; elk schrijft zijn eigen resultaat zodra klaar.
+    // Chunks serieel met pacing tegen rate limit; elk schrijft zijn resultaat zodra klaar.
     await mapWithConcurrency(chunks, MAX_PARALLEL, async (chunk, i) => {
         try {
             const { restaurant: r, lines } = await extractChunk(client, chunk, i, chunks.length);
@@ -266,7 +298,7 @@ export const analyzeStreamHandler = asyncHandler(async (req, res) => {
             console.error(`[wijnkaart] chunk ${i + 1}/${chunks.length} mislukt:`, msg);
             send({ type: 'chunk-error', index: i, message: msg });
         }
-    });
+    }, PACING_MS);
 
     send({
         type: 'done',
@@ -329,7 +361,7 @@ export const analyzeHandler = asyncHandler(async (req, res) => {
             errors.push(`chunk ${i + 1}: ${msg}`);
             return { restaurant: '', lines: [] };
         }
-    });
+    }, PACING_MS);
 
     for (let i = 0; i < results.length; i++) {
         if (i === 0 && results[i].restaurant) restaurant = results[i].restaurant;
