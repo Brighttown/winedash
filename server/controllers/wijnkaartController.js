@@ -71,9 +71,10 @@ const WIJNKAART_TOOL = {
 };
 
 const MODEL = 'claude-haiku-4-5-20251001';
-const TARGET_CHUNK_SIZE = 3000;
-const MAX_CHUNK_SIZE = 5000;
-const MAX_CHUNKS = 12;
+const TARGET_CHUNK_SIZE = 3500;
+const MAX_CHUNK_SIZE = 6000;
+const MAX_CHUNKS = 60;
+const MAX_PARALLEL = 8;
 
 // ─── Section-aware adaptive chunking ──────────────────────────────────────────
 
@@ -128,6 +129,21 @@ function buildAdaptiveChunks(text, target = TARGET_CHUNK_SIZE, max = MAX_CHUNK_S
 }
 
 // ─── AI extractie per chunk ───────────────────────────────────────────────────
+
+/** Map met concurrency-limiet — voorkomt 429s bij grote wijnkaarten. */
+async function mapWithConcurrency(items, limit, fn) {
+    const results = new Array(items.length);
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (true) {
+            const i = cursor++;
+            if (i >= items.length) return;
+            results[i] = await fn(items[i], i);
+        }
+    });
+    await Promise.all(workers);
+    return results;
+}
 
 function buildAnthropicClient() {
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -222,8 +238,8 @@ export const analyzeStreamHandler = asyncHandler(async (req, res) => {
     let restaurant = '';
     let chunkErrors = 0;
 
-    // Alle chunks parallel; elk schrijft zijn eigen resultaat zodra klaar.
-    await Promise.all(chunks.map(async (chunk, i) => {
+    // Chunks parallel met concurrency-limiet; elk schrijft zijn eigen resultaat zodra klaar.
+    await mapWithConcurrency(chunks, MAX_PARALLEL, async (chunk, i) => {
         try {
             const { restaurant: r, lines } = await extractChunk(client, chunk, i, chunks.length);
             if (i === 0 && r && !restaurant) restaurant = r;
@@ -243,7 +259,7 @@ export const analyzeStreamHandler = asyncHandler(async (req, res) => {
             console.error(`[wijnkaart] chunk ${i + 1}/${chunks.length} mislukt:`, msg);
             send({ type: 'chunk-error', index: i, message: msg });
         }
-    }));
+    });
 
     send({
         type: 'done',
@@ -298,7 +314,7 @@ export const analyzeHandler = asyncHandler(async (req, res) => {
     const allLines = [];
     const errors = [];
 
-    const results = await Promise.all(chunks.map(async (chunk, i) => {
+    const results = await mapWithConcurrency(chunks, MAX_PARALLEL, async (chunk, i) => {
         try {
             return await extractChunk(client, chunk, i, chunks.length);
         } catch (err) {
@@ -306,7 +322,7 @@ export const analyzeHandler = asyncHandler(async (req, res) => {
             errors.push(`chunk ${i + 1}: ${msg}`);
             return { restaurant: '', lines: [] };
         }
-    }));
+    });
 
     for (let i = 0; i < results.length; i++) {
         if (i === 0 && results[i].restaurant) restaurant = results[i].restaurant;
