@@ -54,7 +54,7 @@ const Layout = () => {
             <div className="fixed inset-0 -z-10 bg-black/30" />
 
             {/* ── Sidebar (desktop) ── */}
-            <div className="hidden md:flex w-64 flex-col relative shadow-2xl overflow-hidden">
+            <div className="hidden md:flex w-64 flex-col sticky top-0 h-screen self-start relative shadow-2xl overflow-hidden">
 
                 {/* Sidebar: zelfde vineyard + extra blur + extra zwart overlay */}
                 <div
