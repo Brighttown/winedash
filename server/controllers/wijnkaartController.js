@@ -71,10 +71,11 @@ const WIJNKAART_TOOL = {
 };
 
 const MODEL = 'claude-haiku-4-5-20251001';
-const TARGET_CHUNK_SIZE = 3500;
-const MAX_CHUNK_SIZE = 6000;
-const MAX_CHUNKS = 60;
+const TARGET_CHUNK_SIZE = 2200;
+const MAX_CHUNK_SIZE = 3500;
+const MAX_CHUNKS = 80;
 const MAX_PARALLEL = 8;
+const MAX_OUTPUT_TOKENS = 8192;
 
 // ─── Section-aware adaptive chunking ──────────────────────────────────────────
 
@@ -162,7 +163,7 @@ async function extractChunk(client, chunk, index, total) {
         : '';
     const response = await client.messages.create({
         model: MODEL,
-        max_tokens: 4096,
+        max_tokens: MAX_OUTPUT_TOKENS,
         tools: [WIJNKAART_TOOL],
         tool_choice: { type: 'tool', name: 'record_wijnkaart' },
         messages: [{
@@ -179,7 +180,13 @@ async function extractChunk(client, chunk, index, total) {
         }]
     });
     const toolUse = response.content.find(b => b.type === 'tool_use');
-    if (!toolUse) return { restaurant: '', lines: [] };
+    if (!toolUse) {
+        console.warn(`[wijnkaart] chunk ${index + 1}/${total}: geen tool_use (stop_reason=${response.stop_reason})`);
+        return { restaurant: '', lines: [] };
+    }
+    if (response.stop_reason === 'max_tokens') {
+        console.warn(`[wijnkaart] chunk ${index + 1}/${total}: max_tokens bereikt — output mogelijk afgekapt`);
+    }
     return {
         restaurant: toolUse.input.restaurant || '',
         lines: Array.isArray(toolUse.input.lines) ? toolUse.input.lines : []
