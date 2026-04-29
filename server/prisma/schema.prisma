@@ -53,6 +53,7 @@ model Wine {
   supplier         String?
   purchase_price   Float       @default(0)
   sell_price       Float?
+  sell_price_glass Float?
   stock_count      Int         @default(0)
   min_stock_alert  Int         @default(0)
   days_in_stock    Int         @default(0)

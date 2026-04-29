@@ -133,6 +133,9 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
             const sellPrice = decision.wineOverrides?.sell_price != null && decision.wineOverrides.sell_price !== ''
                 ? Number(decision.wineOverrides.sell_price)
                 : null;
+            const sellPriceGlass = decision.wineOverrides?.sell_price_glass != null && decision.wineOverrides.sell_price_glass !== ''
+                ? Number(decision.wineOverrides.sell_price_glass)
+                : null;
             const rawVintage = decision.wineOverrides?.vintage ?? line.vintage;
             const vintage = rawVintage ? Number(rawVintage) : null;
 
@@ -145,6 +148,8 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                     data: {
                         stock_count: { increment: quantity },
                         purchase_price: purchasePrice || existing.purchase_price,
+                        sell_price: sellPrice ?? existing.sell_price,
+                        sell_price_glass: sellPriceGlass ?? existing.sell_price_glass,
                         supplier: supplierName
                     }
                 });
@@ -199,7 +204,8 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                     data: {
                         stock_count: { increment: quantity },
                         purchase_price: purchasePrice || existing.purchase_price,
-                        sell_price: sellPrice || existing.sell_price,
+                        sell_price: sellPrice ?? existing.sell_price,
+                        sell_price_glass: sellPriceGlass ?? existing.sell_price_glass,
                         supplier: supplierName,
                     }
                 });
@@ -213,6 +219,7 @@ export const confirmInvoiceHandler = asyncHandler(async (req, res) => {
                         supplier: supplierName,
                         purchase_price: purchasePrice,
                         sell_price: sellPrice,
+                        sell_price_glass: sellPriceGlass,
                         stock_count: quantity,
                         min_stock_alert: 0,
                         company_id

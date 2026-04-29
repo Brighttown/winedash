@@ -4,7 +4,7 @@ import api from '../api/axios';
 import { toast } from 'react-hot-toast';
 import {
     UploadCloud, CheckCircle, AlertTriangle, Sparkles, Search, X,
-    Save, Trash2, Loader2, Wine, FileText, ChevronDown, ChevronUp
+    Save, Trash2, Loader2, Wine, FileText, ChevronDown, ChevronUp, Zap
 } from 'lucide-react';
 
 const TYPE_OPTIONS = [
@@ -12,6 +12,8 @@ const TYPE_OPTIONS = [
     { value: 'rose', label: 'Rosé' }, { value: 'sparkling', label: 'Bruisend' },
     { value: 'dessert', label: 'Dessert' }
 ];
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const InputField = ({ label, value, onChange, type = 'text', step, options, className, placeholder, disabled }) => (
     <div className={className}>
@@ -27,7 +29,31 @@ const InputField = ({ label, value, onChange, type = 'text', step, options, clas
     </div>
 );
 
-// step: 'upload' | 'text' | 'review'
+const buildRowFromLine = (line, match = null) => ({
+    ...line,
+    match,
+    action: match?.fromInventory && match?.matched ? 'update-stock'
+        : match?.matched ? 'link-existing' : 'create-catalog',
+    selected: true,
+    newCatalog: {
+        name: line.name || '',
+        type: line.type_hint && line.type_hint !== 'unknown' ? line.type_hint : 'red',
+        region: '', subregion: '', country: '', grape: '',
+        winery: line.producer || '', bottle_size: line.bottle_size || ''
+    },
+    overrides: {
+        sell_price: line.sell_price || '',
+        per_glas: !!line.sell_price_glass,
+        sell_price_glass: line.sell_price_glass || '',
+        purchase_price: '',
+        vintage: line.vintage || '',
+        non_vintage: !line.vintage,
+        quantity: 0
+    },
+    suggesting: false
+});
+
+// step: 'upload' | 'text' | 'detect' | 'review'
 const WijnkaartImportPage = () => {
     const [file, setFile] = useState(null);
     const [step, setStep] = useState('upload');
@@ -35,7 +61,16 @@ const WijnkaartImportPage = () => {
     const [textChars, setTextChars] = useState(0);
     const [textExpanded, setTextExpanded] = useState(false);
     const [parsing, setParsing] = useState(false);
-    const [analyzing, setAnalyzing] = useState(false);
+
+    // detect-stap (streaming)
+    const [detecting, setDetecting] = useState(false);
+    const [detectDone, setDetectDone] = useState(false);
+    const [totalChunks, setTotalChunks] = useState(0);
+    const [chunksDone, setChunksDone] = useState(0);
+    const [detectedLines, setDetectedLines] = useState([]);
+
+    // review-stap
+    const [matching, setMatching] = useState(false);
     const [restaurant, setRestaurant] = useState('');
     const [rows, setRows] = useState([]);
     const [saving, setSaving] = useState(false);
@@ -44,7 +79,10 @@ const WijnkaartImportPage = () => {
     const [searchResults, setSearchResults] = useState([]);
 
     const onDrop = useCallback(accepted => {
-        if (accepted?.length > 0) { setFile(accepted[0]); setStep('upload'); setRows([]); setExtractedText(''); }
+        if (accepted?.length > 0) {
+            setFile(accepted[0]); setStep('upload'); setRows([]); setExtractedText('');
+            setDetectedLines([]); setDetectDone(false); setChunksDone(0); setTotalChunks(0);
+        }
     }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -83,41 +121,102 @@ const WijnkaartImportPage = () => {
         }
     };
 
-    // Stap 2: tekst → AI → wijnen
-    const handleAnalyze = async () => {
-        setAnalyzing(true);
-        const toastId = toast.loading('AI analyseert wijnkaart… (kan even duren)', { duration: Infinity });
+    // Stap 2 → 3: streaming detectie
+    const handleDetect = async () => {
+        setDetecting(true);
+        setDetectDone(false);
+        setDetectedLines([]);
+        setChunksDone(0);
+        setTotalChunks(0);
+        setRestaurant('');
+        setStep('detect');
+
+        const token = localStorage.getItem('token');
         try {
-            const { data } = await api.post('/wijnkaart/analyze', { text: extractedText }, { timeout: 180000 });
-            setRestaurant(data.restaurant || '');
-            setRows(data.lines.map(line => ({
-                ...line,
-                action: line.match?.fromInventory && line.match?.matched ? 'update-stock'
-                    : line.match?.matched ? 'link-existing' : 'create-catalog',
-                selected: true,
-                newCatalog: {
-                    name: line.name || '',
-                    type: line.type_hint && line.type_hint !== 'unknown' ? line.type_hint : 'red',
-                    region: '', subregion: '', country: '', grape: '',
-                    winery: line.producer || '', bottle_size: line.bottle_size || ''
+            const resp = await fetch(`${API_BASE}/wijnkaart/analyze-stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
                 },
-                overrides: {
-                    sell_price: line.sell_price || '',
-                    per_glas: !!line.sell_price_glass,
-                    sell_price_glass: line.sell_price_glass || '',
-                    purchase_price: '',
-                    vintage: line.vintage || '',
-                    non_vintage: !line.vintage,
-                    quantity: 0
-                },
-                suggesting: false
-            })));
-            setStep('review');
-            toast.success(`Klaar: ${data.lines.length} wijnen herkend`, { id: toastId });
+                body: JSON.stringify({ text: extractedText })
+            });
+            if (!resp.ok || !resp.body) {
+                let msg = 'Fout bij analyseren.';
+                try { const j = await resp.json(); msg = j.error || msg; } catch {}
+                throw new Error(msg);
+            }
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            const seen = new Set();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                for (const raw of lines) {
+                    if (!raw.trim()) continue;
+                    let evt;
+                    try { evt = JSON.parse(raw); } catch { continue; }
+                    if (evt.type === 'start') {
+                        setTotalChunks(evt.totalChunks);
+                    } else if (evt.type === 'chunk') {
+                        setChunksDone(c => c + 1);
+                        if (Array.isArray(evt.lines) && evt.lines.length) {
+                            setDetectedLines(prev => {
+                                const out = [...prev];
+                                for (const l of evt.lines) {
+                                    const key = `${(l.name || '').toLowerCase().trim()}|${l.vintage || ''}`;
+                                    if (seen.has(key)) continue;
+                                    seen.add(key);
+                                    out.push(l);
+                                }
+                                return out;
+                            });
+                        }
+                    } else if (evt.type === 'chunk-error') {
+                        setChunksDone(c => c + 1);
+                        console.warn('[wijnkaart] chunk error:', evt.message);
+                    } else if (evt.type === 'done') {
+                        if (evt.restaurant) setRestaurant(evt.restaurant);
+                        setDetectDone(true);
+                        if (evt.failed) toast.error('AI-extractie mislukt voor alle delen.');
+                        else if (evt.partial) toast('Sommige delen zijn niet verwerkt.', { icon: '⚠️' });
+                    }
+                }
+            }
         } catch (err) {
-            toast.error(err.response?.data?.error || 'Fout bij analyseren.', { id: toastId });
+            toast.error(err.message || 'Fout bij streaming detectie.');
+            setStep('text');
         } finally {
-            setAnalyzing(false);
+            setDetecting(false);
+        }
+    };
+
+    // Stap 3 → 4: lazy matching
+    const handleGoToReview = async () => {
+        if (detectedLines.length === 0) {
+            toast.error('Geen wijnen gedetecteerd.');
+            return;
+        }
+        setMatching(true);
+        try {
+            const { data } = await api.post('/wijnkaart/match', { lines: detectedLines }, { timeout: 60000 });
+            const matches = Array.isArray(data.matches) ? data.matches : [];
+            setRows(detectedLines.map((line, i) => buildRowFromLine(line, matches[i] || null)));
+            setStep('review');
+        } catch (err) {
+            // Fallback: door zonder matches; gebruiker kan handmatig zoeken
+            console.error('[wijnkaart] match mislukt:', err);
+            setRows(detectedLines.map(line => buildRowFromLine(line, null)));
+            setStep('review');
+            toast('Matching mislukt — gebruik handmatig zoeken / AI-suggestie.', { icon: '⚠️' });
+        } finally {
+            setMatching(false);
         }
     };
 
@@ -183,7 +282,7 @@ const WijnkaartImportPage = () => {
 
             const { data } = await api.post('/invoice/confirm', { supplier: restaurant || 'Wijnkaart Import', decisions });
             toast.success(`Import klaar: ${data.createdWines} nieuw, ${data.updatedWines} bijgewerkt, ${data.createdCatalog} catalogus-entries`, { id: toastId });
-            setFile(null); setStep('upload'); setRows([]); setRestaurant(''); setExtractedText('');
+            reset();
         } catch (err) {
             toast.error(err.response?.data?.error || 'Import mislukt.', { id: toastId });
         } finally {
@@ -191,8 +290,13 @@ const WijnkaartImportPage = () => {
         }
     };
 
-    const reset = () => { setFile(null); setStep('upload'); setRows([]); setRestaurant(''); setExtractedText(''); };
+    const reset = () => {
+        setFile(null); setStep('upload'); setRows([]); setRestaurant(''); setExtractedText('');
+        setDetectedLines([]); setDetectDone(false); setChunksDone(0); setTotalChunks(0);
+    };
+
     const selectedCount = rows.filter(r => r.selected).length;
+    const detectProgress = totalChunks > 0 ? Math.min(100, Math.round((chunksDone / totalChunks) * 100)) : 0;
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
@@ -202,17 +306,18 @@ const WijnkaartImportPage = () => {
             </div>
 
             {/* Stap indicator */}
-            <div className="flex items-center gap-2 text-sm">
-                {['upload', 'text', 'review'].map((s, idx) => {
-                    const labels = ['1. Upload', '2. Tekst controleren', '3. Wijnen bevestigen'];
+            <div className="flex items-center gap-2 text-sm flex-wrap">
+                {['upload', 'text', 'detect', 'review'].map((s, idx) => {
+                    const labels = ['1. Upload', '2. Tekst', '3. Detectie', '4. Koppelen'];
+                    const order = ['upload', 'text', 'detect', 'review'];
                     const active = step === s;
-                    const done = ['upload', 'text', 'review'].indexOf(step) > idx;
+                    const done = order.indexOf(step) > idx;
                     return (
                         <React.Fragment key={s}>
                             <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${active ? 'bg-[#7B2D3A] text-white' : done ? 'bg-green-600/40 text-green-300' : 'bg-white/10 text-white/30'}`}>
                                 {labels[idx]}
                             </span>
-                            {idx < 2 && <span className="text-white/20">→</span>}
+                            {idx < 3 && <span className="text-white/20">→</span>}
                         </React.Fragment>
                     );
                 })}
@@ -268,15 +373,95 @@ const WijnkaartImportPage = () => {
                         <button onClick={reset} className="px-4 py-3 border border-white/20 rounded-xl text-white/60 hover:bg-white/10 transition-colors flex items-center gap-1">
                             <Trash2 size={16} /> Opnieuw
                         </button>
-                        <button onClick={handleAnalyze} disabled={analyzing}
+                        <button onClick={handleDetect} disabled={detecting}
                             className="flex-1 py-3 bg-[#7B2D3A] text-white font-bold rounded-xl hover:bg-[#6A2433] disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10 transition-colors">
-                            {analyzing ? <><Loader2 size={18} className="animate-spin" /> AI analyseert… (kan even duren)</> : <><Sparkles size={18} /> Analyseer met AI</>}
+                            <Sparkles size={18} /> Wijnen detecteren
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* ── Stap 3: Review wijnen ── */}
+            {/* ── Stap 3: Streaming detectie ── */}
+            {step === 'detect' && (
+                <div className="glass rounded-2xl shadow-xl p-6 space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <p className="font-bold text-white flex items-center gap-2">
+                                <Zap size={18} className="text-amber-300" />
+                                {detecting ? 'AI scant wijnkaart…' : 'Detectie klaar'}
+                            </p>
+                            <p className="text-sm text-white/40">
+                                {totalChunks > 0
+                                    ? `${chunksDone} van ${totalChunks} secties verwerkt · ${detectedLines.length} wijnen gevonden`
+                                    : 'Bezig met starten…'}
+                            </p>
+                        </div>
+                        {!detecting && detectDone && <CheckCircle size={24} className="text-green-400 shrink-0" />}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-gradient-to-r from-[#7B2D3A] to-[#C4758A] transition-all duration-300"
+                            style={{ width: `${detectProgress}%` }}
+                        />
+                    </div>
+
+                    {/* Lijst die zich vult terwijl chunks binnenkomen */}
+                    <div className="border border-white/10 rounded-xl bg-black/20 max-h-[420px] overflow-y-auto">
+                        {detectedLines.length === 0 ? (
+                            <div className="p-8 text-center text-white/30 text-sm">
+                                {detecting ? 'Wachten op eerste resultaten…' : 'Geen wijnen herkend.'}
+                            </div>
+                        ) : (
+                            <ul className="divide-y divide-white/5">
+                                {detectedLines.map((l, i) => (
+                                    <li key={i} className="px-4 py-2 text-sm flex items-center justify-between gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-white truncate">
+                                                {l.name}
+                                                {l.vintage && <span className="text-white/40 text-xs ml-2">{l.vintage}</span>}
+                                                {l.producer && <span className="text-white/40 text-xs ml-2">· {l.producer}</span>}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs shrink-0">
+                                            {l.type_hint && l.type_hint !== 'unknown' && (
+                                                <span className="px-2 py-0.5 rounded-full bg-white/5 text-white/50">
+                                                    {TYPE_OPTIONS.find(t => t.value === l.type_hint)?.label || l.type_hint}
+                                                </span>
+                                            )}
+                                            {l.sell_price && <span className="text-white/70 font-mono">€{Number(l.sell_price).toFixed(2)}</span>}
+                                            {l.sell_price_glass && (
+                                                <span className="text-white/50 font-mono">glas €{Number(l.sell_price_glass).toFixed(2)}</span>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button onClick={reset} className="px-4 py-3 border border-white/20 rounded-xl text-white/60 hover:bg-white/10 transition-colors flex items-center gap-1">
+                            <Trash2 size={16} /> Annuleer
+                        </button>
+                        <button
+                            onClick={handleGoToReview}
+                            disabled={detecting || matching || detectedLines.length === 0}
+                            className="flex-1 py-3 bg-[#7B2D3A] text-white font-bold rounded-xl hover:bg-[#6A2433] disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10 transition-colors"
+                        >
+                            {matching
+                                ? <><Loader2 size={18} className="animate-spin" /> Matchen tegen catalogus…</>
+                                : detecting
+                                    ? <><Loader2 size={18} className="animate-spin" /> Wacht op detectie…</>
+                                    : <><Wine size={18} /> Doorgaan naar koppelen ({detectedLines.length})</>
+                            }
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Stap 4: Review wijnen ── */}
             {step === 'review' && (
                 <>
                     <div className="glass rounded-2xl shadow-xl p-5">
