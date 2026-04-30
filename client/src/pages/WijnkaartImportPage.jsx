@@ -164,6 +164,8 @@ const WijnkaartImportPage = () => {
                     try { evt = JSON.parse(raw); } catch { continue; }
                     if (evt.type === 'start') {
                         setTotalChunks(evt.totalChunks);
+                    } else if (evt.type === 'ping') {
+                        // keep-alive, niets te doen
                     } else if (evt.type === 'chunk') {
                         setChunksDone(c => c + 1);
                         if (Array.isArray(evt.lines) && evt.lines.length) {

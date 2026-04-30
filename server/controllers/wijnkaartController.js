@@ -71,13 +71,13 @@ const WIJNKAART_TOOL = {
 };
 
 const MODEL = 'claude-haiku-4-5-20251001';
-const TARGET_CHUNK_SIZE = 1500;
-const MAX_CHUNK_SIZE = 2400;
-const MAX_CHUNKS = 100;
-const MAX_PARALLEL = 1; // serieel; rate limit van 4k output tokens/min staat parallellisme niet toe
-const MAX_OUTPUT_TOKENS = 3500; // onder de 4000/min budget zodat een call niet upfront geweigerd wordt
-const PACING_MS = 16000; // ~3.7 calls/min, blijft onder 4k output- en 10k input-budget per minuut
-const MAX_RETRIES = 4;
+const TARGET_CHUNK_SIZE = 900;       // ~12-15 wijnen per chunk
+const MAX_CHUNK_SIZE = 1400;
+const MAX_CHUNKS = 120;
+const MAX_PARALLEL = 1;              // serieel; tier 0 limit (4k output/min) staat parallel niet toe
+const MAX_OUTPUT_TOKENS = 1800;      // budget van 4000/min - elke call reserveert max_tokens
+const PACING_MS = 32000;             // ~1.9 calls/min × 1800 = 3400 reserved/min, onder 4k cap
+const MAX_RETRIES = 5;
 
 // ─── Section-aware adaptive chunking ──────────────────────────────────────────
 
@@ -273,6 +273,13 @@ export const analyzeStreamHandler = asyncHandler(async (req, res) => {
 
     send({ type: 'start', totalChunks: chunks.length });
 
+    // Keep-alive: stuur elke 10s een ping zodat proxies/browsers de stream niet sluiten
+    // (een grote kaart kan 5+ minuten duren door rate-limit pacing).
+    const keepalive = setInterval(() => {
+        try { send({ type: 'ping' }); } catch {}
+    }, 10000);
+    res.on('close', () => clearInterval(keepalive));
+
     const seen = new Set();
     let restaurant = '';
     let chunkErrors = 0;
@@ -300,6 +307,7 @@ export const analyzeStreamHandler = asyncHandler(async (req, res) => {
         }
     }, PACING_MS);
 
+    clearInterval(keepalive);
     send({
         type: 'done',
         restaurant,
