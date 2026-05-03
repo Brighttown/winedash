@@ -1,0 +1,380 @@
+import React, { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
+import { User, Building2, Plug, Plus, Trash2, X, Check, KeyRound, Loader2 } from 'lucide-react';
+import {
+    getMe, updateProfile, updatePassword, updateCompany,
+    listIntegrations, createIntegration, deleteIntegration, updateIntegration,
+} from '../api/account';
+
+const PROVIDERS = [
+    { value: 'lightspeed', label: 'Lightspeed' },
+    { value: 'untill',     label: 'Untill' },
+    { value: 'square',     label: 'Square' },
+    { value: 'other',      label: 'Anders' },
+];
+
+const Section = ({ icon: Icon, title, subtitle, children }) => (
+    <div className="glass rounded-2xl p-6 mb-6 animate-slide-up">
+        <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-[#7B2D3A]/40 border border-[#C4758A]/30 flex items-center justify-center">
+                <Icon size={18} className="text-[#C4758A]" />
+            </div>
+            <div>
+                <h2 className="text-lg font-bold text-white" style={{ fontFamily: "'Inria Serif', serif" }}>{title}</h2>
+                {subtitle && <p className="text-xs text-white/50">{subtitle}</p>}
+            </div>
+        </div>
+        {children}
+    </div>
+);
+
+const Field = ({ label, children }) => (
+    <label className="block">
+        <span className="block text-xs font-semibold uppercase tracking-wider text-white/50 mb-1.5">{label}</span>
+        {children}
+    </label>
+);
+
+const Account = () => {
+    const [loading, setLoading] = useState(true);
+    const [me, setMe] = useState(null);
+    const [company, setCompany] = useState(null);
+    const [integrations, setIntegrations] = useState([]);
+    const [showAdd, setShowAdd] = useState(false);
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [savingCompany, setSavingCompany] = useState(false);
+    const [savingPassword, setSavingPassword] = useState(false);
+
+    const [profile, setProfile] = useState({ name: '', email: '' });
+    const [companyForm, setCompanyForm] = useState({ name: '', logo_url: '', primary_color: '', secondary_color: '' });
+    const [pwd, setPwd] = useState({ current_password: '', new_password: '' });
+
+    const refresh = async () => {
+        try {
+            const [meRes, intRes] = await Promise.all([getMe(), listIntegrations()]);
+            setMe(meRes.user);
+            setCompany(meRes.company);
+            setProfile({ name: meRes.user.name || '', email: meRes.user.email || '' });
+            setCompanyForm({
+                name: meRes.company?.name || '',
+                logo_url: meRes.company?.logo_url || '',
+                primary_color: meRes.company?.primary_color || '',
+                secondary_color: meRes.company?.secondary_color || '',
+            });
+            setIntegrations(intRes);
+        } catch (e) {
+            toast.error('Kon account niet laden');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { refresh(); }, []);
+
+    const onSaveProfile = async (e) => {
+        e.preventDefault();
+        setSavingProfile(true);
+        try {
+            const u = await updateProfile(profile);
+            toast.success('Profiel opgeslagen');
+            const stored = JSON.parse(localStorage.getItem('user') || '{}');
+            localStorage.setItem('user', JSON.stringify({ ...stored, name: u.name, email: u.email }));
+            setMe(u);
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Opslaan mislukt');
+        } finally { setSavingProfile(false); }
+    };
+
+    const onSaveCompany = async (e) => {
+        e.preventDefault();
+        setSavingCompany(true);
+        try {
+            const c = await updateCompany(companyForm);
+            toast.success('Bedrijfsgegevens opgeslagen');
+            setCompany(c);
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Opslaan mislukt');
+        } finally { setSavingCompany(false); }
+    };
+
+    const onSavePassword = async (e) => {
+        e.preventDefault();
+        if (pwd.new_password.length < 8) return toast.error('Nieuw wachtwoord moet ≥ 8 tekens zijn');
+        setSavingPassword(true);
+        try {
+            await updatePassword(pwd);
+            toast.success('Wachtwoord gewijzigd');
+            setPwd({ current_password: '', new_password: '' });
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Wijzigen mislukt');
+        } finally { setSavingPassword(false); }
+    };
+
+    const onDeleteIntegration = async (id) => {
+        if (!window.confirm('Koppeling verwijderen?')) return;
+        try {
+            await deleteIntegration(id);
+            setIntegrations(integrations.filter(i => i.id !== id));
+            toast.success('Koppeling verwijderd');
+        } catch {
+            toast.error('Verwijderen mislukt');
+        }
+    };
+
+    const onToggleActive = async (row) => {
+        try {
+            const updated = await updateIntegration(row.id, { is_active: !row.is_active });
+            setIntegrations(integrations.map(i => i.id === row.id ? updated : i));
+        } catch {
+            toast.error('Kon status niet wijzigen');
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64 text-white/60">
+                <Loader2 className="animate-spin mr-2" size={20} /> Laden…
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-3xl mx-auto">
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "'Inria Serif', serif" }}>Mijn account</h1>
+                <p className="text-sm text-white/50 mt-1">Beheer je profiel, bedrijfsinfo en kassakoppelingen.</p>
+            </div>
+
+            {/* Profiel */}
+            <Section icon={User} title="Profiel" subtitle="Persoonlijke gegevens">
+                <form onSubmit={onSaveProfile} className="grid sm:grid-cols-2 gap-4">
+                    <Field label="Naam">
+                        <input className="input-glass" value={profile.name}
+                            onChange={e => setProfile({ ...profile, name: e.target.value })} />
+                    </Field>
+                    <Field label="E-mail">
+                        <input type="email" className="input-glass" value={profile.email}
+                            onChange={e => setProfile({ ...profile, email: e.target.value })} />
+                    </Field>
+                    <Field label="Gebruikersnaam">
+                        <input className="input-glass opacity-60" value={me?.username || ''} disabled />
+                    </Field>
+                    <Field label="Rol">
+                        <input className="input-glass opacity-60" value={me?.role || ''} disabled />
+                    </Field>
+                    <div className="sm:col-span-2 flex justify-end">
+                        <button type="submit" disabled={savingProfile}
+                            className="px-5 py-2.5 rounded-xl bg-[#7B2D3A] hover:bg-[#8c3845] text-white font-semibold text-sm shadow-lg disabled:opacity-50">
+                            {savingProfile ? 'Opslaan…' : 'Profiel opslaan'}
+                        </button>
+                    </div>
+                </form>
+            </Section>
+
+            {/* Wachtwoord */}
+            <Section icon={KeyRound} title="Wachtwoord" subtitle="Wijzig je inloggegevens">
+                <form onSubmit={onSavePassword} className="grid sm:grid-cols-2 gap-4">
+                    <Field label="Huidig wachtwoord">
+                        <input type="password" className="input-glass" autoComplete="current-password"
+                            value={pwd.current_password}
+                            onChange={e => setPwd({ ...pwd, current_password: e.target.value })} />
+                    </Field>
+                    <Field label="Nieuw wachtwoord">
+                        <input type="password" className="input-glass" autoComplete="new-password"
+                            value={pwd.new_password}
+                            onChange={e => setPwd({ ...pwd, new_password: e.target.value })} />
+                    </Field>
+                    <div className="sm:col-span-2 flex justify-end">
+                        <button type="submit" disabled={savingPassword}
+                            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-sm disabled:opacity-50">
+                            {savingPassword ? 'Wijzigen…' : 'Wachtwoord wijzigen'}
+                        </button>
+                    </div>
+                </form>
+            </Section>
+
+            {/* Bedrijf */}
+            <Section icon={Building2} title="Bedrijf" subtitle="Bedrijfsgegevens & branding">
+                <form onSubmit={onSaveCompany} className="grid sm:grid-cols-2 gap-4">
+                    <Field label="Bedrijfsnaam">
+                        <input className="input-glass" value={companyForm.name}
+                            onChange={e => setCompanyForm({ ...companyForm, name: e.target.value })} />
+                    </Field>
+                    <Field label="Logo URL">
+                        <input className="input-glass" placeholder="https://…" value={companyForm.logo_url}
+                            onChange={e => setCompanyForm({ ...companyForm, logo_url: e.target.value })} />
+                    </Field>
+                    <Field label="Primaire kleur">
+                        <div className="flex gap-2">
+                            <input type="color" className="h-10 w-12 rounded-xl bg-transparent border border-white/20 cursor-pointer"
+                                value={companyForm.primary_color || '#7B2D3A'}
+                                onChange={e => setCompanyForm({ ...companyForm, primary_color: e.target.value })} />
+                            <input className="input-glass flex-1" placeholder="#7B2D3A" value={companyForm.primary_color}
+                                onChange={e => setCompanyForm({ ...companyForm, primary_color: e.target.value })} />
+                        </div>
+                    </Field>
+                    <Field label="Secundaire kleur">
+                        <div className="flex gap-2">
+                            <input type="color" className="h-10 w-12 rounded-xl bg-transparent border border-white/20 cursor-pointer"
+                                value={companyForm.secondary_color || '#C4758A'}
+                                onChange={e => setCompanyForm({ ...companyForm, secondary_color: e.target.value })} />
+                            <input className="input-glass flex-1" placeholder="#C4758A" value={companyForm.secondary_color}
+                                onChange={e => setCompanyForm({ ...companyForm, secondary_color: e.target.value })} />
+                        </div>
+                    </Field>
+                    <div className="sm:col-span-2 flex justify-end">
+                        <button type="submit" disabled={savingCompany}
+                            className="px-5 py-2.5 rounded-xl bg-[#7B2D3A] hover:bg-[#8c3845] text-white font-semibold text-sm shadow-lg disabled:opacity-50">
+                            {savingCompany ? 'Opslaan…' : 'Bedrijf opslaan'}
+                        </button>
+                    </div>
+                </form>
+            </Section>
+
+            {/* Kassakoppelingen */}
+            <Section icon={Plug} title="Kassakoppelingen" subtitle="Verbind je POS-systeem">
+                <div className="space-y-2 mb-4">
+                    {integrations.length === 0 && (
+                        <div className="text-center py-8 text-white/40 text-sm border border-dashed border-white/10 rounded-xl">
+                            Nog geen kassakoppelingen toegevoegd.
+                        </div>
+                    )}
+                    {integrations.map(row => {
+                        const provider = PROVIDERS.find(p => p.value === row.provider);
+                        return (
+                            <div key={row.id} className="glass-sm rounded-xl p-4 flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-lg bg-[#7B2D3A]/40 border border-white/10 flex items-center justify-center shrink-0">
+                                    <Plug size={16} className="text-[#C4758A]" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-semibold text-white truncate">{row.display_name}</p>
+                                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/10 text-white/60">
+                                            {provider?.label || row.provider}
+                                        </span>
+                                        {row.is_active ? (
+                                            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Actief</span>
+                                        ) : (
+                                            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/5 text-white/40 border border-white/10">Inactief</span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-white/40 truncate font-mono">key: {row.api_key_masked}</p>
+                                </div>
+                                <button onClick={() => onToggleActive(row)} title={row.is_active ? 'Deactiveren' : 'Activeren'}
+                                    className="text-white/40 hover:text-white p-2 rounded-lg hover:bg-white/10">
+                                    <Check size={16} />
+                                </button>
+                                <button onClick={() => onDeleteIntegration(row.id)} title="Verwijderen"
+                                    className="text-white/40 hover:text-red-400 p-2 rounded-lg hover:bg-white/10">
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <button onClick={() => setShowAdd(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/20 hover:border-[#C4758A]/50 hover:bg-white/5 text-white/70 hover:text-white transition-colors text-sm font-semibold">
+                    <Plus size={16} /> Koppeling toevoegen
+                </button>
+            </Section>
+
+            {showAdd && (
+                <AddIntegrationModal
+                    onClose={() => setShowAdd(false)}
+                    onCreated={(row) => { setIntegrations([row, ...integrations]); setShowAdd(false); }}
+                />
+            )}
+        </div>
+    );
+};
+
+const AddIntegrationModal = ({ onClose, onCreated }) => {
+    const [form, setForm] = useState({
+        provider: 'lightspeed',
+        display_name: '',
+        api_key: '',
+        api_secret: '',
+        location_id: '',
+    });
+    const [saving, setSaving] = useState(false);
+
+    const submit = async (e) => {
+        e.preventDefault();
+        if (!form.display_name.trim() || !form.api_key.trim()) {
+            return toast.error('Naam en API-sleutel zijn verplicht');
+        }
+        setSaving(true);
+        try {
+            const row = await createIntegration({
+                ...form,
+                api_secret: form.api_secret || null,
+                location_id: form.location_id || null,
+            });
+            toast.success('Koppeling toegevoegd');
+            onCreated(row);
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Toevoegen mislukt');
+        } finally { setSaving(false); }
+    };
+
+    return (
+        <>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={onClose} />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+                <form onSubmit={submit} className="glass rounded-2xl p-6 w-full max-w-md pointer-events-auto animate-slide-up">
+                    <div className="flex items-center justify-between mb-5">
+                        <h3 className="text-lg font-bold text-white" style={{ fontFamily: "'Inria Serif', serif" }}>Kassakoppeling toevoegen</h3>
+                        <button type="button" onClick={onClose} className="text-white/40 hover:text-white p-1 rounded-lg hover:bg-white/10">
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-4">
+                        <Field label="Kassasysteem">
+                            <select className="select-glass" value={form.provider}
+                                onChange={e => setForm({ ...form, provider: e.target.value })}>
+                                {PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Naam (eigen referentie)">
+                            <input className="input-glass" placeholder="bv. Hoofdvestiging Amsterdam"
+                                value={form.display_name}
+                                onChange={e => setForm({ ...form, display_name: e.target.value })} />
+                        </Field>
+                        <Field label="API-sleutel">
+                            <input className="input-glass" type="password" autoComplete="off"
+                                value={form.api_key}
+                                onChange={e => setForm({ ...form, api_key: e.target.value })} />
+                        </Field>
+                        <Field label="API-secret (optioneel)">
+                            <input className="input-glass" type="password" autoComplete="off"
+                                value={form.api_secret}
+                                onChange={e => setForm({ ...form, api_secret: e.target.value })} />
+                        </Field>
+                        <Field label="Locatie-ID (optioneel)">
+                            <input className="input-glass" value={form.location_id}
+                                onChange={e => setForm({ ...form, location_id: e.target.value })} />
+                        </Field>
+                        <p className="text-[11px] text-white/40 leading-relaxed">
+                            Credentials worden versleuteld opgeslagen. De daadwerkelijke synchronisatie met je kassa volgt in een latere update.
+                        </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 mt-6">
+                        <button type="button" onClick={onClose}
+                            className="px-4 py-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 text-sm">
+                            Annuleren
+                        </button>
+                        <button type="submit" disabled={saving}
+                            className="px-5 py-2 rounded-xl bg-[#7B2D3A] hover:bg-[#8c3845] text-white font-semibold text-sm shadow-lg disabled:opacity-50">
+                            {saving ? 'Opslaan…' : 'Toevoegen'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </>
+    );
+};
+
+export default Account;

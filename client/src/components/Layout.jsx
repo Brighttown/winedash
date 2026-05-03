@@ -162,18 +162,24 @@ const Layout = () => {
 
                     {/* Gebruiker onderaan */}
                     <div className="p-4 border-t border-white/10">
-                        <div className="flex items-center gap-3 px-2">
-                            <div className="w-8 h-8 rounded-full bg-[#7B2D3A]/60 border border-[#C4758A]/30 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                {(user.name || user.username || '?')[0].toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-white truncate">{user.name || user.username}</p>
-                                <p className="text-[10px] text-white/30 truncate">@{user.username}</p>
-                            </div>
+                        <div className="flex items-center gap-2 px-1">
+                            <button
+                                onClick={() => navigate('/account')}
+                                title="Mijn account"
+                                className={`flex items-center gap-3 flex-1 min-w-0 p-1.5 rounded-xl transition-colors ${location.pathname.startsWith('/account') ? 'bg-white/10' : 'hover:bg-white/10'}`}
+                            >
+                                <div className="w-8 h-8 rounded-full bg-[#7B2D3A]/60 border border-[#C4758A]/30 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                    {(user.name || user.username || '?')[0].toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0 text-left">
+                                    <p className="text-sm font-semibold text-white truncate">{user.name || user.username}</p>
+                                    <p className="text-[10px] text-white/30 truncate">@{user.username}</p>
+                                </div>
+                            </button>
                             <button
                                 onClick={handleLogout}
                                 title="Uitloggen"
-                                className="text-white/30 hover:text-[#C4758A] transition-colors p-1 rounded-lg hover:bg-white/10 shrink-0"
+                                className="text-white/30 hover:text-[#C4758A] transition-colors p-1.5 rounded-lg hover:bg-white/10 shrink-0"
                             >
                                 <LogOut size={16} />
                             </button>

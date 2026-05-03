@@ -18,6 +18,8 @@ import stockMovementsRoutes from './routes/stockMovements.js';
 import wijnkaartRoutes from './routes/wijnkaart.js';
 import wineExportRoutes from './routes/wineExport.js';
 import transactionsRoutes from './routes/transactions.js';
+import accountRoutes from './routes/account.js';
+import integrationsRoutes from './routes/integrations.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -92,6 +94,8 @@ app.use('/api/wines/:wineId/movements', stockMovementsRoutes);
 app.use('/api/wijnkaart', uploadLimiter, wijnkaartRoutes);
 app.use('/api/wine-export', wineExportRoutes);
 app.use('/api/transactions', transactionsRoutes);
+app.use('/api/account', accountRoutes);
+app.use('/api/integrations', integrationsRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
