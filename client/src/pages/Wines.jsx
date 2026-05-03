@@ -219,7 +219,7 @@ const Wines = () => {
                                             <td className="p-4 font-bold text-white">€{wine.sell_price?.toFixed(2)}</td>
                                             <td className="p-4 text-right" onClick={e => e.stopPropagation()}>
                                                 <button onClick={e => { e.stopPropagation(); setMutationsWine(wine); }} title="Mutaties" className="p-2 text-white/30 hover:text-[#C4758A] transition-colors"><ClipboardList size={16} /></button>
-                                                <button onClick={e => openEditModal(wine, e)} title="Bewerken" className="p-2 text-white/30 hover:text-white transition-colors ml-1"><Edit2 size={16} /></button>
+                                                <button onClick={e => { e.stopPropagation(); navigate(`/wines/${wine.id}`); }} title="Bewerken" className="p-2 text-white/30 hover:text-white transition-colors ml-1"><Edit2 size={16} /></button>
                                                 <button onClick={e => { e.stopPropagation(); handleDelete(wine.id); }} title="Verwijderen" className="p-2 text-white/30 hover:text-red-400 transition-colors ml-1"><Trash2 size={16} /></button>
                                             </td>
                                         </tr>
@@ -247,7 +247,7 @@ const Wines = () => {
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                                         <button onClick={e => { e.stopPropagation(); setMutationsWine(wine); }} className="p-2 text-white/30 hover:text-[#C4758A] transition-colors"><ClipboardList size={16} /></button>
-                                        <button onClick={e => openEditModal(wine, e)} className="p-2 text-white/30 hover:text-white transition-colors"><Edit2 size={16} /></button>
+                                        <button onClick={e => { e.stopPropagation(); navigate(`/wines/${wine.id}`); }} className="p-2 text-white/30 hover:text-white transition-colors"><Edit2 size={16} /></button>
                                         <button onClick={e => { e.stopPropagation(); handleDelete(wine.id); }} className="p-2 text-white/30 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
                                     </div>
                                 </div>
