@@ -16,6 +16,7 @@ import WijnkaartImportPage from './pages/WijnkaartImportPage';
 import WijnExportPage from './pages/WijnExportPage';
 import Transactions from './pages/Transactions';
 import Account from './pages/Account';
+import WineDetail from './pages/WineDetail';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -44,6 +45,7 @@ function App() {
           <Route path="catalog/:id" element={<CatalogDetail />} />
           {/* User routes */}
           <Route path="wines" element={<Wines />} />
+          <Route path="wines/:id" element={<WineDetail />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="upload" element={<UploadPage />} />
           <Route path="invoice-import" element={<InvoiceImportPage />} />

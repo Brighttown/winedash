@@ -11,6 +11,7 @@ const createSchema = z.object({
     api_key: z.string().min(1).max(500),
     api_secret: z.string().max(500).optional().nullable(),
     location_id: z.string().max(100).optional().nullable(),
+    config: z.record(z.any()).optional().nullable(),
 });
 
 const updateSchema = z.object({
@@ -18,6 +19,7 @@ const updateSchema = z.object({
     api_key: z.string().min(1).max(500).optional(),
     api_secret: z.string().max(500).optional().nullable(),
     location_id: z.string().max(100).optional().nullable(),
+    config: z.record(z.any()).optional().nullable(),
     is_active: z.boolean().optional(),
 });
 
@@ -28,6 +30,7 @@ const serialize = (row) => ({
     api_key_masked: maskSecret(row.api_key_enc),
     has_secret: !!row.api_secret_enc,
     location_id: row.location_id,
+    config: row.config || null,
     is_active: row.is_active,
     last_synced_at: row.last_synced_at,
     created_at: row.created_at,
@@ -46,7 +49,7 @@ export const createIntegration = asyncHandler(async (req, res) => {
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
     const { company_id } = req.user;
-    const { provider, display_name, api_key, api_secret, location_id } = parsed.data;
+    const { provider, display_name, api_key, api_secret, location_id, config } = parsed.data;
 
     const row = await prisma.pOSIntegration.create({
         data: {
@@ -56,6 +59,7 @@ export const createIntegration = asyncHandler(async (req, res) => {
             api_key_enc: encryptSecret(api_key),
             api_secret_enc: encryptSecret(api_secret),
             location_id: location_id || null,
+            config: config || null,
         },
     });
     res.status(201).json(serialize(row));
@@ -76,6 +80,7 @@ export const updateIntegration = asyncHandler(async (req, res) => {
     if (parsed.data.api_key !== undefined) data.api_key_enc = encryptSecret(parsed.data.api_key);
     if (parsed.data.api_secret !== undefined) data.api_secret_enc = encryptSecret(parsed.data.api_secret);
     if (parsed.data.location_id !== undefined) data.location_id = parsed.data.location_id || null;
+    if (parsed.data.config !== undefined) data.config = parsed.data.config || null;
     if (parsed.data.is_active !== undefined) data.is_active = parsed.data.is_active;
 
     const row = await prisma.pOSIntegration.update({

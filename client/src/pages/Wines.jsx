@@ -201,7 +201,7 @@ const Wines = () => {
                                 </thead>
                                 <tbody className="divide-y divide-white/10 text-sm">
                                     {filtered.map(wine => (
-                                        <tr key={wine.id} onClick={() => navigateToCatalog(wine)} className="hover:bg-white/5 transition-colors cursor-pointer group">
+                                        <tr key={wine.id} onClick={() => navigate(`/wines/${wine.id}`)} className="hover:bg-white/5 transition-colors cursor-pointer group">
                                             <td className="p-4">
                                                 <div className="font-bold text-white group-hover:text-[#C4758A] transition-colors">{wine.name} {wine.vintage && <span className="text-white/30 font-normal">({wine.vintage})</span>}</div>
                                                 <div className="text-white/40 text-xs mt-0.5">{wine.region}, {wine.country}</div>
@@ -233,7 +233,7 @@ const Wines = () => {
                         <div className="md:hidden divide-y divide-white/10">
                             {filtered.length === 0 && <p className="p-8 text-center text-white/30 italic">Geen wijnen gevonden</p>}
                             {filtered.map(wine => (
-                                <div key={wine.id} onClick={() => navigateToCatalog(wine)} className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 active:bg-white/10 cursor-pointer transition-colors">
+                                <div key={wine.id} onClick={() => navigate(`/wines/${wine.id}`)} className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 active:bg-white/10 cursor-pointer transition-colors">
                                     <div className="flex-1 min-w-0">
                                         <p className="font-bold text-white text-sm leading-tight truncate">
                                             {wine.name} {wine.vintage && <span className="text-white/40 font-normal">({wine.vintage})</span>}
