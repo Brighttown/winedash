@@ -3,13 +3,126 @@ import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
     ArrowLeft, BookOpen, Package, Tag, Truck, Plug, RefreshCw,
-    Save, Loader2, ClipboardList,
+    Save, Loader2, ClipboardList, TrendingUp, TrendingDown, BarChart3,
 } from 'lucide-react';
 import api from '../api/axios';
 import StockMutationsModal from '../components/StockMutationsModal';
 
 const TYPE_LABELS = { red: 'Rood', white: 'Wit', rose: 'Rosé', sparkling: 'Bubbels', dessert: 'Dessert' };
 const UNIT_LABELS = { bottle: 'Fles', glass: 'Glas', half_bottle: 'Halve fles' };
+const PERIOD_OPTIONS = [
+    { days: 7,   label: '7 dagen' },
+    { days: 30,  label: '30 dagen' },
+    { days: 90,  label: '90 dagen' },
+    { days: 365, label: '1 jaar' },
+];
+
+const fmtEur = (n) => `€${(n || 0).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtPct = (n) => `${n >= 0 ? '+' : ''}${Math.round(n * 100)}%`;
+const fmtDate = (iso) => new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+
+const StatsSection = ({ wineId }) => {
+    const [period, setPeriod] = useState(30);
+    const [stats, setStats] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        api.get(`/wines/${wineId}/stats`, { params: { days: period } })
+            .then(r => { if (!cancelled) setStats(r.data); })
+            .catch(() => { if (!cancelled) setStats(null); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [wineId, period]);
+
+    const maxBar = useMemo(() => {
+        if (!stats) return 1;
+        return Math.max(1, ...stats.series.map(s => s.units));
+    }, [stats]);
+
+    return (
+        <div className="glass rounded-2xl p-6 mb-6 animate-slide-up">
+            <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#7B2D3A]/40 border border-[#C4758A]/30 flex items-center justify-center shrink-0">
+                        <BarChart3 size={18} className="text-[#C4758A]" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-white" style={{ fontFamily: "'Inria Serif', serif" }}>Verkoopstatistieken</h2>
+                        <p className="text-xs text-white/50">Hoe presteert deze wijn?</p>
+                    </div>
+                </div>
+                <div className="flex gap-1 glass-sm rounded-xl p-1">
+                    {PERIOD_OPTIONS.map(opt => (
+                        <button key={opt.days} onClick={() => setPeriod(opt.days)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                period === opt.days ? 'bg-[#7B2D3A] text-white' : 'text-white/60 hover:text-white'
+                            }`}>
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="h-32 flex items-center justify-center text-white/50">
+                    <Loader2 className="animate-spin" size={18} />
+                </div>
+            ) : !stats ? (
+                <p className="text-center text-sm text-white/40 py-6">Geen statistieken beschikbaar.</p>
+            ) : (
+                <>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                        <Kpi label="Verkocht" value={`${stats.units_sold}×`}
+                            delta={stats.prev_units_sold > 0 ? stats.delta_pct : null} />
+                        <Kpi label="Omzet" value={fmtEur(stats.revenue)} />
+                        <Kpi label="Winst" value={fmtEur(stats.profit)}
+                            sub={stats.revenue > 0 ? `marge ${Math.round((stats.profit / stats.revenue) * 100)}%` : null} />
+                        <Kpi label="Gemiddeld/dag" value={stats.avg_per_day.toFixed(1)}
+                            sub={stats.days_until_empty != null ? `nog ~${stats.days_until_empty} dagen voorraad` : 'voldoende voorraad'} />
+                    </div>
+
+                    {/* Bar chart */}
+                    <div className="glass-sm rounded-xl p-4">
+                        <div className="flex items-end gap-[2px] h-24">
+                            {stats.series.map((d, i) => {
+                                const h = (d.units / maxBar) * 100;
+                                return (
+                                    <div key={i} className="flex-1 flex flex-col justify-end group relative" title={`${fmtDate(d.date)}: ${d.units}`}>
+                                        <div
+                                            className={`rounded-sm transition-colors ${d.units > 0 ? 'bg-[#C4758A] group-hover:bg-[#d68aa0]' : 'bg-white/5'}`}
+                                            style={{ height: `${Math.max(h, 2)}%` }}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="flex justify-between text-[10px] text-white/40 mt-2">
+                            <span>{fmtDate(stats.series[0]?.date)}</span>
+                            {stats.best_day && <span className="text-[#C4758A]">Beste dag: {fmtDate(stats.best_day.date)} ({stats.best_day.units}×)</span>}
+                            <span>{fmtDate(stats.series[stats.series.length - 1]?.date)}</span>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
+const Kpi = ({ label, value, sub, delta }) => (
+    <div className="glass-sm rounded-xl p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{label}</p>
+        <p className="text-xl font-black text-white mt-0.5">{value}</p>
+        {delta != null && (
+            <p className={`text-[11px] mt-1 flex items-center gap-1 ${delta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {delta >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                {fmtPct(delta)} t.o.v. vorige periode
+            </p>
+        )}
+        {sub && delta == null && <p className="text-[11px] text-white/40 mt-1">{sub}</p>}
+    </div>
+);
 
 const Section = ({ icon: Icon, title, subtitle, action, children }) => (
     <div className="glass rounded-2xl p-6 mb-6 animate-slide-up">
@@ -186,6 +299,9 @@ const WineDetail = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Verkoopstatistieken */}
+            <StatsSection wineId={id} />
 
             {/* Voorraad + prijzen + leverancier */}
             <Section icon={Package} title="Mijn voorraad & prijzen" subtitle="Per-restaurant gegevens">
