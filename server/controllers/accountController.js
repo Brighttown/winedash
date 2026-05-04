@@ -22,9 +22,17 @@ const styleSlot = z.object({
     weight: z.enum(FONT_WEIGHTS).optional(),
 }).strict();
 
+const priceStyleSlot = z.object({
+    font: z.enum(FONT_FAMILIES).optional(),
+    size: z.number().min(6).max(48).optional(),
+    weight: z.enum(FONT_WEIGHTS).optional(),
+    decimal: z.enum(['.', ',']).optional(),
+}).strict();
+
 const menuStyleSchema = z.object({
     heading: styleSlot.optional(),
     body: styleSlot.optional(),
+    price: priceStyleSlot.optional(),
 }).strict();
 
 const iconSchema = z.object({

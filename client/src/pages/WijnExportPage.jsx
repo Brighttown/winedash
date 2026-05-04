@@ -58,16 +58,13 @@ const WINE_TOKENS = [
 ];
 
 const PRICE_TOKENS = [
-    { key: 'sell_price', label: 'Fles € 25,00' },
-    { key: 'sell_price_glass', label: 'Glas € 5,00' },
-    { key: 'price', label: 'Fles 25,00' },
-    { key: 'price_glass', label: 'Glas 5,00' },
+    { key: 'sell_price', label: 'Fles 25,00' },
+    { key: 'sell_price_glass', label: 'Glas 5,00' },
 ];
 
-const fmtEur = (v) => v != null ? `€ ${Number(v).toFixed(2)}` : '';
-const fmtNum = (v) => v != null ? Number(v).toFixed(2).replace('.', ',') : '';
+const fmtNum = (v, dec = ',') => v != null ? Number(v).toFixed(2).replace('.', dec) : '';
 
-const TOKEN_RESOLVERS = {
+const buildResolvers = (decimal = ',') => ({
     name:             w => w.name,
     vintage:          w => w.vintage,
     winery:           w => w.winery,
@@ -76,22 +73,22 @@ const TOKEN_RESOLVERS = {
     country:          w => w.country,
     grape:            w => w.grape,
     type:             w => TYPE_LABELS[w.type] || w.type,
-    sell_price:       w => fmtEur(w.sell_price),
-    sell_price_glass: w => fmtEur(w.sell_price_glass),
-    price:            w => fmtNum(w.sell_price),
-    price_glass:      w => fmtNum(w.sell_price_glass),
-};
+    sell_price:       w => fmtNum(w.sell_price, decimal),
+    sell_price_glass: w => fmtNum(w.sell_price_glass, decimal),
+    price:            w => fmtNum(w.sell_price, decimal),
+    price_glass:      w => fmtNum(w.sell_price_glass, decimal),
+});
 
 const SEP_CLASS = '[\\s\\-\\/\\|\\*·•+]';
-const formatTemplate = (template, wine) => {
+const formatTemplate = (template, wine, decimal = ',') => {
     if (!template) return '';
+    const resolvers = buildResolvers(decimal);
     let out = template.replace(/\[(\w+)\]/g, (_, key) => {
-        const fn = TOKEN_RESOLVERS[key];
+        const fn = resolvers[key];
         if (!fn) return '';
         const v = fn(wine);
         return v === null || v === undefined || v === '' ? '' : String(v);
     });
-    // Drop separators around dropped tokens (consecutive separators collapse to one space).
     out = out.replace(new RegExp(`(${SEP_CLASS})+(?=$|${SEP_CLASS})`, 'g'), '');
     out = out.replace(new RegExp(`^${SEP_CLASS}+|${SEP_CLASS}+$`, 'g'), '');
     return out.replace(/\s+/g, ' ').trim();
@@ -187,7 +184,15 @@ const RuleEditor = ({ rule, onChange, onDelete }) => {
 
 // ────────────────────────────────────────────────────────────────────────────
 
-const GroupCard = ({ group, depth, parentId, onUpdate, onDelete, onAddChild, previewCount }) => {
+const SPLIT_FIELDS = [
+    { value: 'country', label: 'Land' },
+    { value: 'grape', label: 'Druif' },
+    { value: 'region', label: 'Wijnstreek' },
+    { value: 'vintage', label: 'Jaartal' },
+    { value: 'winery', label: 'Wijnhuis' },
+];
+
+const GroupCard = ({ group, depth, parentId, onUpdate, onDelete, onAddChild, onSplit, previewCount }) => {
     const [open, setOpen] = useState(true);
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: group.id,
@@ -241,6 +246,15 @@ const GroupCard = ({ group, depth, parentId, onUpdate, onDelete, onAddChild, pre
                     >
                         {SORT_OPTIONS.map(s => <option key={s.value} value={s.value} style={{ background: '#1B4332', color: 'white' }}>{s.label}</option>)}
                     </select>
+                    <select
+                        value=""
+                        onChange={e => { if (e.target.value) onSplit?.(group.id, e.target.value); e.target.value = ''; }}
+                        className="shrink-0 bg-white/10 border border-white/15 rounded px-1.5 py-1 text-white text-xs outline-none"
+                        title="Verdeel in subgroepen"
+                    >
+                        <option value="" style={{ background: '#1B4332', color: 'white' }}>Verdeel in…</option>
+                        {SPLIT_FIELDS.map(f => <option key={f.value} value={f.value} style={{ background: '#1B4332', color: 'white' }}>{f.label}</option>)}
+                    </select>
                     <button
                         onClick={() => onAddChild(group.id)}
                         title="Subgroep toevoegen"
@@ -282,7 +296,7 @@ const GroupCard = ({ group, depth, parentId, onUpdate, onDelete, onAddChild, pre
 
 // ────────────────────────────────────────────────────────────────────────────
 
-const SortableLevel = ({ groups, parentId, depth, onUpdate, onDelete, onAddChild, previewMap, onReorder }) => {
+const SortableLevel = ({ groups, parentId, depth, onUpdate, onDelete, onAddChild, onSplit, previewMap, onReorder }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -308,6 +322,7 @@ const SortableLevel = ({ groups, parentId, depth, onUpdate, onDelete, onAddChild
                             onUpdate={(ng) => onUpdate(g.id, () => ng)}
                             onDelete={onDelete}
                             onAddChild={onAddChild}
+                            onSplit={onSplit}
                             previewCount={previewMap?.[g.id]}
                         />
                         {g.children.length > 0 && (
@@ -318,6 +333,7 @@ const SortableLevel = ({ groups, parentId, depth, onUpdate, onDelete, onAddChild
                                 onUpdate={onUpdate}
                                 onDelete={onDelete}
                                 onAddChild={onAddChild}
+                                onSplit={onSplit}
                                 previewMap={previewMap}
                                 onReorder={onReorder}
                             />
@@ -366,7 +382,7 @@ const PreviewTree = ({ tree, depth = 0, wineFormat, priceFormat, iconAssignments
                                             )}
                                         </span>
                                         <span className="shrink-0 text-white/50 font-medium">
-                                            {customPrice ?? (w.sell_price != null ? `€ ${Number(w.sell_price).toFixed(2)}` : '—')}
+                                            {customPrice ?? (w.sell_price != null ? Number(w.sell_price).toFixed(2).replace('.', ',') : '—')}
                                         </span>
                                     </li>
                                 );
@@ -467,6 +483,55 @@ const WijnExportPage = () => {
     const handleAddChild = (parentId) => setGroups(g => addChildGroup(g, parentId, newGroup('Subgroep')));
     const handleAddRoot = () => setGroups(g => [...g, newGroup()]);
     const handleReorder = (parentId, oldIndex, newIndex) => setGroups(g => reorderSiblings(g, parentId, oldIndex, newIndex));
+
+    // Verdeel een groep automatisch in subgroepen op basis van een veld.
+    const handleSplit = (groupId, field) => {
+        if (!previewTree) return toast.error('Preview nog niet geladen');
+        // Vind de matching node in previewTree
+        const findNode = (nodes) => {
+            for (const n of nodes) {
+                if (n.id === groupId) return n;
+                const found = findNode(n.children);
+                if (found) return found;
+            }
+            return null;
+        };
+        const node = findNode(previewTree);
+        if (!node) return toast.error('Kan groep niet vinden in preview — wacht even tot de preview is bijgewerkt');
+
+        // Verzamel alle wijnen in deze groep + subgroepen
+        const collectWines = (n) => [...n.wines, ...n.children.flatMap(collectWines)];
+        const wines = collectWines(node);
+        if (wines.length === 0) return toast.error('Geen wijnen in deze groep om te verdelen');
+
+        // Distinct waarden voor het veld
+        const values = new Set();
+        for (const w of wines) {
+            const v = w[field];
+            if (v == null || v === '') continue;
+            if (field === 'grape' && typeof v === 'string') {
+                // Druif kan komma-gescheiden zijn; pak per losse druif
+                v.split(',').map(s => s.trim()).filter(Boolean).forEach(s => values.add(s));
+            } else {
+                values.add(String(v));
+            }
+        }
+        if (values.size === 0) return toast.error('Geen waarden gevonden voor dit veld');
+
+        const sorted = [...values].sort((a, b) => {
+            const na = Number(a), nb = Number(b);
+            if (Number.isFinite(na) && Number.isFinite(nb)) return nb - na; // jaartal aflopend
+            return a.localeCompare(b);
+        });
+
+        const newChildren = sorted.map(val => ({
+            ...newGroup(val),
+            rules: [{ field, op: field === 'grape' ? 'contains' : 'equals', value: val }],
+        }));
+
+        setGroups(gs => updateGroup(gs, groupId, g => ({ ...g, children: newChildren })));
+        toast.success(`Verdeeld in ${newChildren.length} subgroep${newChildren.length === 1 ? '' : 'en'}`);
+    };
 
     const loadTemplate = async (id) => {
         try {
@@ -705,6 +770,7 @@ const WijnExportPage = () => {
                             onUpdate={handleUpdate}
                             onDelete={handleDelete}
                             onAddChild={handleAddChild}
+                            onSplit={handleSplit}
                             previewMap={previewMap}
                             onReorder={handleReorder}
                         />

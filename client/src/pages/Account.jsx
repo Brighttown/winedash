@@ -52,6 +52,7 @@ const Account = () => {
     const DEFAULT_MENU_STYLE = {
         heading: { font: 'Helvetica', size: 18, weight: 'bold' },
         body:    { font: 'Helvetica', size: 11,   weight: 'normal' },
+        price:   { font: 'Helvetica', size: 11,   weight: 'bold', decimal: ',' },
     };
     const [menuStyle, setMenuStyle] = useState(DEFAULT_MENU_STYLE);
     const [savingMenuStyle, setSavingMenuStyle] = useState(false);
@@ -75,6 +76,7 @@ const Account = () => {
             setMenuStyle({
                 heading: { ...DEFAULT_MENU_STYLE.heading, ...(ms.heading || {}) },
                 body:    { ...DEFAULT_MENU_STYLE.body,    ...(ms.body    || {}) },
+                price:   { ...DEFAULT_MENU_STYLE.price,   ...(ms.price   || {}) },
             });
             setIcons(meRes.company?.icons || []);
             setIntegrations(intRes);
@@ -307,12 +309,13 @@ const Account = () => {
             <Section icon={Type} title="Wijnkaart-stijl" subtitle="Lettertype en grootte voor de PDF-export">
                 <form onSubmit={onSaveMenuStyle} className="space-y-5">
                     {[
-                        { slot: 'heading', label: 'Kop tekst (groep-titels)' },
-                        { slot: 'body',    label: 'Body tekst (wijn-regels)' },
-                    ].map(({ slot, label }) => (
+                        { slot: 'heading', label: 'Kop tekst (groep-titels)', sample: 'Voorbeeld: Rode wijnen' },
+                        { slot: 'body',    label: 'Body tekst (wijn-regels)', sample: 'Voorbeeld: Château Lafite — Bordeaux — Cabernet Sauvignon' },
+                        { slot: 'price',   label: 'Prijs',                    sample: null },
+                    ].map(({ slot, label, sample }) => (
                         <div key={slot} className="glass-sm rounded-xl p-4">
                             <p className="text-xs font-bold uppercase tracking-wider text-white/50 mb-3">{label}</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className={`grid grid-cols-1 ${slot === 'price' ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
                                 <Field label="Lettertype">
                                     <select className="select-glass" value={menuStyle[slot].font}
                                         onChange={e => setMenuStyle(s => ({ ...s, [slot]: { ...s[slot], font: e.target.value } }))}>
@@ -333,6 +336,15 @@ const Account = () => {
                                         <option value="bold">Vetgedrukt</option>
                                     </select>
                                 </Field>
+                                {slot === 'price' && (
+                                    <Field label="Decimaal">
+                                        <select className="select-glass" value={menuStyle.price.decimal || ','}
+                                            onChange={e => setMenuStyle(s => ({ ...s, price: { ...s.price, decimal: e.target.value } }))}>
+                                            <option value=",">Komma (25,00)</option>
+                                            <option value=".">Punt (25.00)</option>
+                                        </select>
+                                    </Field>
+                                )}
                             </div>
                             <p className="mt-3 px-3 py-2 rounded-lg bg-black/20 border border-white/5"
                                 style={{
@@ -343,7 +355,7 @@ const Account = () => {
                                     fontWeight: menuStyle[slot].weight === 'bold' ? 700 : 400,
                                     color: 'white',
                                 }}>
-                                {slot === 'heading' ? 'Voorbeeld: Rode wijnen' : 'Voorbeeld: Château Lafite — Bordeaux — Cabernet Sauvignon'}
+                                {sample ?? `Voorbeeld: 25${menuStyle.price.decimal || ','}00 / 5${menuStyle.price.decimal || ','}00`}
                             </p>
                         </div>
                     ))}

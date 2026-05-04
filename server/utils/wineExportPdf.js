@@ -33,12 +33,11 @@ const drawIcon = (doc, icon, x, baselineY, lineHeight) => {
     }
 };
 
-const fmtPrice = (v) => v == null ? '' : `€ ${Number(v).toFixed(2)}`;
-const fmtPriceNum = (v) => v == null ? '' : Number(v).toFixed(2).replace('.', ',');
+const fmtPrice = (v, decimal = ',') => v == null ? '' : Number(v).toFixed(2).replace('.', decimal);
 
 const TYPE_LABELS = { red: 'Rood', white: 'Wit', rose: 'Rosé', sparkling: 'Bubbels', dessert: 'Dessert' };
 
-const TOKEN_RESOLVERS = {
+const buildResolvers = (decimal) => ({
     name:             w => w.name,
     vintage:          w => w.vintage,
     winery:           w => w.winery,
@@ -47,12 +46,12 @@ const TOKEN_RESOLVERS = {
     country:          w => w.country,
     grape:            w => w.grape,
     type:             w => TYPE_LABELS[w.type] || w.type,
-    sell_price:       w => fmtPrice(w.sell_price),
-    sell_price_glass: w => fmtPrice(w.sell_price_glass),
-    price:            w => fmtPriceNum(w.sell_price),
-    price_glass:      w => fmtPriceNum(w.sell_price_glass),
+    sell_price:       w => fmtPrice(w.sell_price, decimal),
+    sell_price_glass: w => fmtPrice(w.sell_price_glass, decimal),
+    price:            w => fmtPrice(w.sell_price, decimal),
+    price_glass:      w => fmtPrice(w.sell_price_glass, decimal),
     bottle_size:      w => w.bottle_size,
-};
+});
 
 // Format-string resolver. Tokens die leeg zijn worden samen met directe
 // omringende separator-tekens (spaces, -, /, |, *, ·, +) weggehaald — zo
@@ -64,10 +63,12 @@ const TOKEN_RE = /\[(\w+)\]/g;
 const SUR_RE = new RegExp(`[${SEP_CHARS}]*${MARKER}+[${SEP_CHARS}]*`, 'g');
 const TRIM_SEP_RE = new RegExp(`^[${SEP_CHARS}]+|[${SEP_CHARS}]+$`, 'g');
 
-export const formatTemplate = (template, wine) => {
+export const formatTemplate = (template, wine, opts = {}) => {
     if (!template) return '';
+    const decimal = opts.decimal === '.' ? '.' : ',';
+    const resolvers = buildResolvers(decimal);
     let out = template.replace(TOKEN_RE, (_, key) => {
-        const fn = TOKEN_RESOLVERS[key];
+        const fn = resolvers[key];
         if (!fn) return MARKER;
         const v = fn(wine);
         return v === null || v === undefined || v === '' ? MARKER : String(v);
@@ -83,6 +84,7 @@ export const formatWineLine = formatTemplate;
 const DEFAULT_STYLE = {
     heading: { font: 'Helvetica', size: 18, weight: 'bold' },
     body:    { font: 'Helvetica', size: 10.5, weight: 'normal' },
+    price:   { font: 'Helvetica', size: 10.5, weight: 'bold', decimal: ',' },
 };
 
 const pdfFont = (family, weight) => {
@@ -95,6 +97,7 @@ const pdfFont = (family, weight) => {
 const mergeStyle = (override) => ({
     heading: { ...DEFAULT_STYLE.heading, ...(override?.heading || {}) },
     body:    { ...DEFAULT_STYLE.body,    ...(override?.body    || {}) },
+    price:   { ...DEFAULT_STYLE.price,   ...(override?.price   || {}) },
 });
 
 /**
@@ -107,6 +110,9 @@ export const renderExportPdf = (res, { title, tree, wineFormat, priceFormat, men
     const style = mergeStyle(menuStyle);
     const headingFont = pdfFont(style.heading.font, style.heading.weight);
     const bodyFont    = pdfFont(style.body.font,    style.body.weight);
+    const priceFont   = pdfFont(style.price.font,   style.price.weight);
+    const priceSize   = style.price.size;
+    const decimal     = style.price.decimal === '.' ? '.' : ',';
     const headingSizeBase = style.heading.size;
     const bodySize        = style.body.size;
 
@@ -142,27 +148,27 @@ export const renderExportPdf = (res, { title, tree, wineFormat, priceFormat, men
                 const left = baseLeft + (iconOnLeft ? iconReserve : 0);
 
                 const priceText = priceFormat && priceFormat.trim()
-                    ? formatTemplate(priceFormat, w)
-                    : fmtPrice(w.sell_price);
+                    ? formatTemplate(priceFormat, w, { decimal })
+                    : fmtPrice(w.sell_price, decimal);
 
-                doc.font(bodyFont).fontSize(bodySize);
+                doc.font(priceFont).fontSize(priceSize);
                 const priceWidth = priceText ? doc.widthOfString(priceText) : 0;
 
                 const startY = doc.y;
 
                 const titleText = wineFormat && wineFormat.trim()
-                    ? formatTemplate(wineFormat, w)
+                    ? formatTemplate(wineFormat, w, { decimal })
                     : (w.vintage ? `${w.name} (${w.vintage})` : w.name);
 
                 const titleWidth = rightEdge - left - priceWidth - (priceWidth ? 10 : 0) - (iconOnRight ? iconReserve : 0);
 
-                doc.fillColor('#1a1a1a');
+                doc.font(bodyFont).fontSize(bodySize).fillColor('#1a1a1a');
                 doc.text(titleText, left, startY, { width: titleWidth });
                 const yAfterTitle = doc.y;
 
                 if (priceText) {
                     const priceX = rightEdge - priceWidth - (iconOnRight ? iconReserve : 0);
-                    doc.font(bodyFont).fontSize(bodySize).fillColor('#7B2D3A')
+                    doc.font(priceFont).fontSize(priceSize).fillColor('#7B2D3A')
                         .text(priceText, priceX, startY);
                 }
                 const yAfterPrice = doc.y;
