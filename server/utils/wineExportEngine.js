@@ -120,7 +120,7 @@ export const validateStructure = (structure) => {
     if (!structure || typeof structure !== 'object') return 'structure must be an object';
     if (!Array.isArray(structure.groups)) return 'structure.groups must be an array';
     const walk = (groups, depth = 0) => {
-        if (depth > 4) return 'maximum nesting depth (5) exceeded';
+        if (depth > 19) return 'maximum nesting depth (20) exceeded';
         for (const g of groups) {
             if (typeof g.name !== 'string') return 'group.name must be a string';
             if (g.sort && !SORT_OPTIONS.includes(g.sort)) return `invalid sort: ${g.sort}`;
