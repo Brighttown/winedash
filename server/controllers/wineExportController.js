@@ -13,8 +13,10 @@ const flattenWine = (w) => ({
     country: w.catalog.country,
     grape: w.catalog.grape,
     winery: w.catalog.winery,
+    bottle_size: w.catalog.bottle_size,
     vintage: w.vintage,
     sell_price: w.sell_price,
+    sell_price_glass: w.sell_price_glass,
     purchase_price: w.purchase_price,
     stock_count: w.stock_count,
 });
@@ -119,6 +121,7 @@ export const generatePdf = asyncHandler(async (req, res) => {
     let structure;
 
     let wineFormat = '';
+    let priceFormat = '';
 
     if (req.body?.template_id) {
         const t = await prisma.wineExportTemplate.findFirst({
@@ -128,12 +131,14 @@ export const generatePdf = asyncHandler(async (req, res) => {
         title = t.title || t.name;
         structure = t.structure;
         wineFormat = t.structure?.wineFormat || '';
+        priceFormat = t.structure?.priceFormat || '';
     } else {
         const err = validateStructure(req.body?.structure);
         if (err) return res.status(400).json({ error: err });
         structure = req.body.structure;
         title = req.body.title || 'Wijnkaart';
         wineFormat = req.body.wineFormat || structure?.wineFormat || '';
+        priceFormat = req.body.priceFormat || structure?.priceFormat || '';
     }
 
     const company = await prisma.company.findUnique({ where: { id: company_id } });
@@ -144,5 +149,11 @@ export const generatePdf = asyncHandler(async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}.pdf"`);
 
-    renderExportPdf(res, { title, tree, companyName: company?.name, wineFormat });
+    renderExportPdf(res, {
+        title,
+        tree,
+        wineFormat,
+        priceFormat,
+        menuStyle: company?.menu_style || null,
+    });
 });

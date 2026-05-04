@@ -25,6 +25,7 @@ model Company {
   logo_url        String?
   primary_color   String?
   secondary_color String?
+  menu_style      Json?    // { heading: { font, size, weight }, body: { font, size, weight } }
   user_id         String
   user            User     @relation(fields: [user_id], references: [id])
 

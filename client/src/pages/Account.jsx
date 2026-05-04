@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { User, Building2, Plug, Plus, Trash2, X, Check, KeyRound, Loader2 } from 'lucide-react';
+import { User, Building2, Plug, Plus, Trash2, X, Check, KeyRound, Loader2, Type } from 'lucide-react';
 import {
     getMe, updateProfile, updatePassword, updateCompany,
     listIntegrations, createIntegration, deleteIntegration, updateIntegration,
@@ -49,6 +49,13 @@ const Account = () => {
     const [companyForm, setCompanyForm] = useState({ name: '', logo_url: '', primary_color: '', secondary_color: '' });
     const [pwd, setPwd] = useState({ current_password: '', new_password: '' });
 
+    const DEFAULT_MENU_STYLE = {
+        heading: { font: 'Helvetica', size: 18, weight: 'bold' },
+        body:    { font: 'Helvetica', size: 11,   weight: 'normal' },
+    };
+    const [menuStyle, setMenuStyle] = useState(DEFAULT_MENU_STYLE);
+    const [savingMenuStyle, setSavingMenuStyle] = useState(false);
+
     const refresh = async () => {
         try {
             const [meRes, intRes] = await Promise.all([getMe(), listIntegrations()]);
@@ -60,6 +67,11 @@ const Account = () => {
                 logo_url: meRes.company?.logo_url || '',
                 primary_color: meRes.company?.primary_color || '',
                 secondary_color: meRes.company?.secondary_color || '',
+            });
+            const ms = meRes.company?.menu_style || {};
+            setMenuStyle({
+                heading: { ...DEFAULT_MENU_STYLE.heading, ...(ms.heading || {}) },
+                body:    { ...DEFAULT_MENU_STYLE.body,    ...(ms.body    || {}) },
             });
             setIntegrations(intRes);
         } catch (e) {
@@ -95,6 +107,18 @@ const Account = () => {
         } catch (e) {
             toast.error(e.response?.data?.error || 'Opslaan mislukt');
         } finally { setSavingCompany(false); }
+    };
+
+    const onSaveMenuStyle = async (e) => {
+        e.preventDefault();
+        setSavingMenuStyle(true);
+        try {
+            const c = await updateCompany({ menu_style: menuStyle });
+            toast.success('Menu-stijl opgeslagen');
+            setCompany(c);
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Opslaan mislukt');
+        } finally { setSavingMenuStyle(false); }
     };
 
     const onSavePassword = async (e) => {
@@ -226,6 +250,59 @@ const Account = () => {
                         <button type="submit" disabled={savingCompany}
                             className="px-5 py-2.5 rounded-xl bg-[#7B2D3A] hover:bg-[#8c3845] text-white font-semibold text-sm shadow-lg disabled:opacity-50">
                             {savingCompany ? 'Opslaan…' : 'Bedrijf opslaan'}
+                        </button>
+                    </div>
+                </form>
+            </Section>
+
+            {/* Wijnkaart-stijl */}
+            <Section icon={Type} title="Wijnkaart-stijl" subtitle="Lettertype en grootte voor de PDF-export">
+                <form onSubmit={onSaveMenuStyle} className="space-y-5">
+                    {[
+                        { slot: 'heading', label: 'Kop tekst (groep-titels)' },
+                        { slot: 'body',    label: 'Body tekst (wijn-regels)' },
+                    ].map(({ slot, label }) => (
+                        <div key={slot} className="glass-sm rounded-xl p-4">
+                            <p className="text-xs font-bold uppercase tracking-wider text-white/50 mb-3">{label}</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <Field label="Lettertype">
+                                    <select className="select-glass" value={menuStyle[slot].font}
+                                        onChange={e => setMenuStyle(s => ({ ...s, [slot]: { ...s[slot], font: e.target.value } }))}>
+                                        <option value="Helvetica">Helvetica (sans)</option>
+                                        <option value="Times-Roman">Times Roman (serif)</option>
+                                        <option value="Courier">Courier (mono)</option>
+                                    </select>
+                                </Field>
+                                <Field label="Grootte (pt)">
+                                    <input type="number" min="6" max="48" className="input-glass"
+                                        value={menuStyle[slot].size}
+                                        onChange={e => setMenuStyle(s => ({ ...s, [slot]: { ...s[slot], size: Number(e.target.value) } }))} />
+                                </Field>
+                                <Field label="Dikte">
+                                    <select className="select-glass" value={menuStyle[slot].weight}
+                                        onChange={e => setMenuStyle(s => ({ ...s, [slot]: { ...s[slot], weight: e.target.value } }))}>
+                                        <option value="normal">Normaal</option>
+                                        <option value="bold">Vetgedrukt</option>
+                                    </select>
+                                </Field>
+                            </div>
+                            <p className="mt-3 px-3 py-2 rounded-lg bg-black/20 border border-white/5"
+                                style={{
+                                    fontFamily: menuStyle[slot].font === 'Times-Roman' ? "'Times New Roman', serif"
+                                              : menuStyle[slot].font === 'Courier' ? "'Courier New', monospace"
+                                              : 'Helvetica, Arial, sans-serif',
+                                    fontSize: `${menuStyle[slot].size}px`,
+                                    fontWeight: menuStyle[slot].weight === 'bold' ? 700 : 400,
+                                    color: 'white',
+                                }}>
+                                {slot === 'heading' ? 'Voorbeeld: Rode wijnen' : 'Voorbeeld: Château Lafite — Bordeaux — Cabernet Sauvignon'}
+                            </p>
+                        </div>
+                    ))}
+                    <div className="flex justify-end">
+                        <button type="submit" disabled={savingMenuStyle}
+                            className="px-5 py-2.5 rounded-xl bg-[#7B2D3A] hover:bg-[#8c3845] text-white font-semibold text-sm shadow-lg disabled:opacity-50">
+                            {savingMenuStyle ? 'Opslaan…' : 'Stijl opslaan'}
                         </button>
                     </div>
                 </form>

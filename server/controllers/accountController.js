@@ -13,11 +13,26 @@ const passwordSchema = z.object({
     new_password: z.string().min(8).max(200),
 });
 
+const FONT_FAMILIES = ['Helvetica', 'Times-Roman', 'Courier'];
+const FONT_WEIGHTS = ['normal', 'bold'];
+
+const styleSlot = z.object({
+    font: z.enum(FONT_FAMILIES).optional(),
+    size: z.number().min(6).max(48).optional(),
+    weight: z.enum(FONT_WEIGHTS).optional(),
+}).strict();
+
+const menuStyleSchema = z.object({
+    heading: styleSlot.optional(),
+    body: styleSlot.optional(),
+}).strict();
+
 const companySchema = z.object({
     name: z.string().min(1).max(100).optional(),
     logo_url: z.string().max(500).optional().nullable(),
     primary_color: z.string().max(20).optional().nullable(),
     secondary_color: z.string().max(20).optional().nullable(),
+    menu_style: menuStyleSchema.optional().nullable(),
 });
 
 const serializeUser = (u) => ({
@@ -35,6 +50,7 @@ const serializeCompany = (c) => c && ({
     logo_url: c.logo_url,
     primary_color: c.primary_color,
     secondary_color: c.secondary_color,
+    menu_style: c.menu_style || null,
 });
 
 export const getMe = asyncHandler(async (req, res) => {

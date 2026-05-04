@@ -46,7 +46,7 @@ const SORT_OPTIONS = [
 const TYPE_OPTIONS = ['red', 'white', 'rose', 'sparkling', 'dessert'];
 const TYPE_LABELS = { red: 'Rood', white: 'Wit', rose: 'Rosé', sparkling: 'Bubbels', dessert: 'Dessert' };
 
-const FORMAT_TOKENS = [
+const WINE_TOKENS = [
     { key: 'name', label: 'Naam' },
     { key: 'vintage', label: 'Jaargang' },
     { key: 'winery', label: 'Wijnhuis' },
@@ -55,29 +55,45 @@ const FORMAT_TOKENS = [
     { key: 'country', label: 'Land' },
     { key: 'grape', label: 'Druif' },
     { key: 'type', label: 'Type' },
-    { key: 'sell_price', label: 'Prijs' },
 ];
 
+const PRICE_TOKENS = [
+    { key: 'sell_price', label: 'Fles € 25,00' },
+    { key: 'sell_price_glass', label: 'Glas € 5,00' },
+    { key: 'price', label: 'Fles 25,00' },
+    { key: 'price_glass', label: 'Glas 5,00' },
+];
+
+const fmtEur = (v) => v != null ? `€ ${Number(v).toFixed(2)}` : '';
+const fmtNum = (v) => v != null ? Number(v).toFixed(2).replace('.', ',') : '';
+
 const TOKEN_RESOLVERS = {
-    name: w => w.name,
-    vintage: w => w.vintage,
-    winery: w => w.winery,
-    region: w => w.region,
-    subregion: w => w.subregion,
-    country: w => w.country,
-    grape: w => w.grape,
-    type: w => TYPE_LABELS[w.type] || w.type,
-    sell_price: w => w.sell_price != null ? `€ ${Number(w.sell_price).toFixed(2)}` : '',
+    name:             w => w.name,
+    vintage:          w => w.vintage,
+    winery:           w => w.winery,
+    region:           w => w.region,
+    subregion:        w => w.subregion,
+    country:          w => w.country,
+    grape:            w => w.grape,
+    type:             w => TYPE_LABELS[w.type] || w.type,
+    sell_price:       w => fmtEur(w.sell_price),
+    sell_price_glass: w => fmtEur(w.sell_price_glass),
+    price:            w => fmtNum(w.sell_price),
+    price_glass:      w => fmtNum(w.sell_price_glass),
 };
 
-const formatWineLine = (template, wine) => {
+const SEP_CLASS = '[\\s\\-\\/\\|\\*·•+]';
+const formatTemplate = (template, wine) => {
     if (!template) return '';
     let out = template.replace(/\[(\w+)\]/g, (_, key) => {
         const fn = TOKEN_RESOLVERS[key];
-        if (!fn) return ' ';
+        if (!fn) return '';
         const v = fn(wine);
-        return v === null || v === undefined || v === '' ? ' ' : String(v);
+        return v === null || v === undefined || v === '' ? '' : String(v);
     });
+    // Drop separators around dropped tokens (consecutive separators collapse to one space).
+    out = out.replace(new RegExp(`(${SEP_CLASS})+(?=$|${SEP_CLASS})`, 'g'), '');
+    out = out.replace(new RegExp(`^${SEP_CLASS}+|${SEP_CLASS}+$`, 'g'), '');
     return out.replace(/\s+/g, ' ').trim();
 };
 
@@ -315,7 +331,7 @@ const SortableLevel = ({ groups, parentId, depth, onUpdate, onDelete, onAddChild
 
 // ────────────────────────────────────────────────────────────────────────────
 
-const PreviewTree = ({ tree, depth = 0, wineFormat }) => {
+const PreviewTree = ({ tree, depth = 0, wineFormat, priceFormat }) => {
     if (!tree || tree.length === 0) return <p className="text-white/30 italic text-sm">Geen groepen.</p>;
     return (
         <div className="space-y-2">
@@ -327,7 +343,8 @@ const PreviewTree = ({ tree, depth = 0, wineFormat }) => {
                     {node.wines.length > 0 && (
                         <ul className="space-y-0.5 text-xs">
                             {node.wines.map(w => {
-                                const customLine = wineFormat?.trim() ? formatWineLine(wineFormat, w) : null;
+                                const customLine = wineFormat?.trim() ? formatTemplate(wineFormat, w) : null;
+                                const customPrice = priceFormat?.trim() ? formatTemplate(priceFormat, w) : null;
                                 return (
                                     <li key={w.id} className="flex justify-between gap-2 text-white/70">
                                         <span className="truncate">
@@ -339,14 +356,14 @@ const PreviewTree = ({ tree, depth = 0, wineFormat }) => {
                                             )}
                                         </span>
                                         <span className="shrink-0 text-white/50 font-medium">
-                                            {w.sell_price != null ? `€ ${Number(w.sell_price).toFixed(2)}` : '—'}
+                                            {customPrice ?? (w.sell_price != null ? `€ ${Number(w.sell_price).toFixed(2)}` : '—')}
                                         </span>
                                     </li>
                                 );
                             })}
                         </ul>
                     )}
-                    {node.children.length > 0 && <PreviewTree tree={node.children} depth={depth + 1} wineFormat={wineFormat} />}
+                    {node.children.length > 0 && <PreviewTree tree={node.children} depth={depth + 1} wineFormat={wineFormat} priceFormat={priceFormat} />}
                 </div>
             ))}
         </div>
@@ -365,10 +382,11 @@ const WijnExportPage = () => {
         { ...newGroup('Witte wijnen'), rules: [{ field: 'type', op: 'equals', value: 'white' }] },
     ]);
     const [wineFormat, setWineFormat] = useState('[name] · [region] · [grape]');
+    const [priceFormat, setPriceFormat] = useState('[sell_price] / [sell_price_glass]');
     const [previewTree, setPreviewTree] = useState(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
-    const structure = useMemo(() => ({ groups, wineFormat }), [groups, wineFormat]);
+    const structure = useMemo(() => ({ groups, wineFormat, priceFormat }), [groups, wineFormat, priceFormat]);
 
     const fetchTemplates = useCallback(async () => {
         try {
@@ -425,6 +443,7 @@ const WijnExportPage = () => {
             setTitle(data.title || 'Wijnkaart');
             setGroups(data.structure?.groups || []);
             setWineFormat(data.structure?.wineFormat ?? '[name] · [region] · [grape]');
+            setPriceFormat(data.structure?.priceFormat ?? '[sell_price] / [sell_price_glass]');
             toast.success('Template geladen');
         } catch { toast.error('Kan template niet laden'); }
     };
@@ -450,6 +469,7 @@ const WijnExportPage = () => {
         setTitle('Wijnkaart');
         setGroups([newGroup('Rode wijnen')]);
         setWineFormat('[name] · [region] · [grape]');
+        setPriceFormat('[sell_price] / [sell_price_glass]');
     };
 
     const deleteTemplate = async () => {
@@ -527,29 +547,66 @@ const WijnExportPage = () => {
                 </div>
             </div>
 
-            <div className="glass rounded-2xl shadow-xl p-4">
-                <label className="text-xs font-bold uppercase tracking-wider text-white/40 mb-2 block">Wijn-notatie per regel</label>
-                <input
-                    value={wineFormat}
-                    onChange={e => setWineFormat(e.target.value)}
-                    placeholder="bv. [name] [region] [grape]"
-                    className="input-glass text-sm font-mono"
-                />
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                    {FORMAT_TOKENS.map(t => (
-                        <button
-                            key={t.key}
-                            onClick={() => setWineFormat(f => `${f}${f && !f.endsWith(' ') ? ' ' : ''}[${t.key}]`)}
-                            className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/15 text-white/70 hover:bg-white/10 hover:text-white transition-colors font-mono"
-                            title={t.label}
-                        >
-                            [{t.key}]
-                        </button>
-                    ))}
+            <div className="glass rounded-2xl shadow-xl p-4 grid gap-4 md:grid-cols-2">
+                <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-white/40 mb-2 block">Wijn-notatie per regel</label>
+                    <input
+                        value={wineFormat}
+                        onChange={e => setWineFormat(e.target.value)}
+                        placeholder="bv. [name] [region] [grape]"
+                        className="input-glass text-sm font-mono"
+                    />
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                        {WINE_TOKENS.map(t => (
+                            <button
+                                key={t.key}
+                                onClick={() => setWineFormat(f => `${f}${f && !f.endsWith(' ') ? ' ' : ''}[${t.key}]`)}
+                                className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/15 text-white/70 hover:bg-white/10 hover:text-white transition-colors font-mono"
+                                title={t.label}
+                            >
+                                [{t.key}]
+                            </button>
+                        ))}
+                    </div>
                 </div>
-                <p className="text-[11px] text-white/30 mt-2">
-                    Tokens worden bij export vervangen door wijnwaarden. Lege velden worden weggelaten.
-                </p>
+
+                <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-white/40 mb-2 block">Prijs-notatie</label>
+                    <input
+                        value={priceFormat}
+                        onChange={e => setPriceFormat(e.target.value)}
+                        placeholder="bv. [sell_price] / [sell_price_glass]"
+                        className="input-glass text-sm font-mono"
+                    />
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                        {PRICE_TOKENS.map(t => (
+                            <button
+                                key={t.key}
+                                onClick={() => setPriceFormat(f => `${f}${f && !f.endsWith(' ') ? ' ' : ''}[${t.key}]`)}
+                                className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/15 text-white/70 hover:bg-white/10 hover:text-white transition-colors font-mono"
+                                title={t.label}
+                            >
+                                [{t.key}]
+                            </button>
+                        ))}
+                        {['/', '|', '-', '·', '*'].map(s => (
+                            <button
+                                key={s}
+                                onClick={() => setPriceFormat(f => `${f}${f && !f.endsWith(' ') ? ' ' : ''}${s} `)}
+                                className="text-[11px] px-2 py-1 rounded-md bg-white/5 border border-white/15 text-white/50 hover:bg-white/10 hover:text-white transition-colors font-mono"
+                                title={`Scheidingsteken ${s}`}
+                            >
+                                {s}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="md:col-span-2">
+                    <p className="text-[11px] text-white/30">
+                        Tokens worden bij export vervangen door wijnwaarden. Lege velden worden weggelaten — separator-tekens (-, /, |, *, ·) eromheen worden netjes opgeschoond.
+                    </p>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -588,7 +645,7 @@ const WijnExportPage = () => {
                     {previewLoading && !previewTree ? (
                         <div className="text-center py-8"><div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto" /></div>
                     ) : (
-                        <PreviewTree tree={previewTree || []} wineFormat={wineFormat} />
+                        <PreviewTree tree={previewTree || []} wineFormat={wineFormat} priceFormat={priceFormat} />
                     )}
                 </div>
             </div>
