@@ -188,6 +188,7 @@ const SPLIT_FIELDS = [
     { value: 'country', label: 'Land' },
     { value: 'grape', label: 'Druif' },
     { value: 'region', label: 'Wijnstreek' },
+    { value: 'subregion', label: 'Regio' },
     { value: 'vintage', label: 'Jaartal' },
     { value: 'winery', label: 'Wijnhuis' },
 ];
