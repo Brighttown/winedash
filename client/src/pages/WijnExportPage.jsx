@@ -414,6 +414,14 @@ const WijnExportPage = () => {
         return () => clearTimeout(handle);
     }, [structure, refreshPreview]);
 
+    // Periodic auto-refresh so de preview meebeweegt met voorraad-wijzigingen elders.
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible') refreshPreview();
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [refreshPreview]);
+
     const previewMap = useMemo(() => {
         const map = {};
         const walk = (nodes) => {
