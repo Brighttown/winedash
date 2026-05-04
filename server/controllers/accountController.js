@@ -27,12 +27,24 @@ const menuStyleSchema = z.object({
     body: styleSlot.optional(),
 }).strict();
 
+const iconSchema = z.object({
+    id: z.string().min(1).max(64),
+    name: z.string().min(1).max(80),
+    mime: z.string().min(1).max(80),
+    data_url: z.string().min(1).max(500_000), // ~500KB base64
+    position: z.object({
+        h: z.enum(['left', 'right']).default('left'),
+        v: z.enum(['top', 'middle', 'bottom']).default('middle'),
+    }).optional(),
+});
+
 const companySchema = z.object({
     name: z.string().min(1).max(100).optional(),
     logo_url: z.string().max(500).optional().nullable(),
     primary_color: z.string().max(20).optional().nullable(),
     secondary_color: z.string().max(20).optional().nullable(),
     menu_style: menuStyleSchema.optional().nullable(),
+    icons: z.array(iconSchema).max(30).optional().nullable(),
 });
 
 const serializeUser = (u) => ({
@@ -51,6 +63,7 @@ const serializeCompany = (c) => c && ({
     primary_color: c.primary_color,
     secondary_color: c.secondary_color,
     menu_style: c.menu_style || null,
+    icons: c.icons || [],
 });
 
 export const getMe = asyncHandler(async (req, res) => {

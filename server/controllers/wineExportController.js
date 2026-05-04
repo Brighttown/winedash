@@ -122,6 +122,7 @@ export const generatePdf = asyncHandler(async (req, res) => {
 
     let wineFormat = '';
     let priceFormat = '';
+    let iconAssignments = {};
 
     if (req.body?.template_id) {
         const t = await prisma.wineExportTemplate.findFirst({
@@ -132,6 +133,7 @@ export const generatePdf = asyncHandler(async (req, res) => {
         structure = t.structure;
         wineFormat = t.structure?.wineFormat || '';
         priceFormat = t.structure?.priceFormat || '';
+        iconAssignments = t.structure?.iconAssignments || {};
     } else {
         const err = validateStructure(req.body?.structure);
         if (err) return res.status(400).json({ error: err });
@@ -139,6 +141,7 @@ export const generatePdf = asyncHandler(async (req, res) => {
         title = req.body.title || 'Wijnkaart';
         wineFormat = req.body.wineFormat || structure?.wineFormat || '';
         priceFormat = req.body.priceFormat || structure?.priceFormat || '';
+        iconAssignments = req.body.iconAssignments || structure?.iconAssignments || {};
     }
 
     const company = await prisma.company.findUnique({ where: { id: company_id } });
@@ -155,5 +158,7 @@ export const generatePdf = asyncHandler(async (req, res) => {
         wineFormat,
         priceFormat,
         menuStyle: company?.menu_style || null,
+        icons: company?.icons || [],
+        iconAssignments,
     });
 });

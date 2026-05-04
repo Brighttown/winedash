@@ -1,4 +1,37 @@
 import PDFDocument from 'pdfkit';
+import SVGtoPDF from 'svg-to-pdfkit';
+
+const ICON_SIZE = 12; // pt
+const ICON_GAP = 4;
+
+/** Decode a data URL to { mime, buffer, raw }. */
+const decodeDataUrl = (dataUrl) => {
+    if (!dataUrl || typeof dataUrl !== 'string') return null;
+    const m = dataUrl.match(/^data:([^;,]+)(;base64)?,(.*)$/);
+    if (!m) return null;
+    const [, mime, b64, body] = m;
+    if (b64) return { mime, buffer: Buffer.from(body, 'base64'), raw: null };
+    return { mime, buffer: null, raw: decodeURIComponent(body) };
+};
+
+const drawIcon = (doc, icon, x, baselineY, lineHeight) => {
+    const decoded = decodeDataUrl(icon.data_url);
+    if (!decoded) return;
+    const v = icon.position?.v || 'middle';
+    let y = baselineY;
+    if (v === 'middle') y = baselineY + (lineHeight - ICON_SIZE) / 2;
+    else if (v === 'bottom') y = baselineY + lineHeight - ICON_SIZE;
+    try {
+        if (/svg/i.test(decoded.mime)) {
+            const svgText = decoded.raw || (decoded.buffer && decoded.buffer.toString('utf8'));
+            if (svgText) SVGtoPDF(doc, svgText, x, y, { width: ICON_SIZE, height: ICON_SIZE, preserveAspectRatio: 'xMidYMid meet' });
+        } else if (decoded.buffer) {
+            doc.image(decoded.buffer, x, y, { fit: [ICON_SIZE, ICON_SIZE] });
+        }
+    } catch (e) {
+        console.warn('[pdf] icon render failed:', e.message);
+    }
+};
 
 const fmtPrice = (v) => v == null ? '' : `€ ${Number(v).toFixed(2)}`;
 const fmtPriceNum = (v) => v == null ? '' : Number(v).toFixed(2).replace('.', ',');
@@ -67,7 +100,7 @@ const mergeStyle = (override) => ({
 /**
  * Renders the export tree to a PDF. Streams to res.
  */
-export const renderExportPdf = (res, { title, tree, wineFormat, priceFormat, menuStyle }) => {
+export const renderExportPdf = (res, { title, tree, wineFormat, priceFormat, menuStyle, icons, iconAssignments }) => {
     const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Title: title || 'Wijnkaart' } });
     doc.pipe(res);
 
@@ -76,6 +109,13 @@ export const renderExportPdf = (res, { title, tree, wineFormat, priceFormat, men
     const bodyFont    = pdfFont(style.body.font,    style.body.weight);
     const headingSizeBase = style.heading.size;
     const bodySize        = style.body.size;
+
+    const iconById = new Map((icons || []).map(i => [i.id, i]));
+    const assignmentMap = iconAssignments || {};
+    const resolveIcon = (wineId) => {
+        const iconId = assignmentMap[wineId];
+        return iconId ? iconById.get(iconId) : null;
+    };
 
     const renderNode = (node, depth) => {
         const headingSize = Math.max(8, headingSizeBase - depth * 3);
@@ -92,8 +132,14 @@ export const renderExportPdf = (res, { title, tree, wineFormat, priceFormat, men
             for (const w of node.wines) {
                 if (doc.y > doc.page.height - 80) doc.addPage();
 
-                const left = doc.page.margins.left + indent + 6;
+                const baseLeft = doc.page.margins.left + indent + 6;
                 const rightEdge = doc.page.width - doc.page.margins.right;
+
+                const icon = resolveIcon(w.id);
+                const iconReserve = icon ? ICON_SIZE + ICON_GAP : 0;
+                const iconOnLeft  = icon && (icon.position?.h || 'left') === 'left';
+                const iconOnRight = icon && (icon.position?.h || 'left') === 'right';
+                const left = baseLeft + (iconOnLeft ? iconReserve : 0);
 
                 const priceText = priceFormat && priceFormat.trim()
                     ? formatTemplate(priceFormat, w)
@@ -108,17 +154,24 @@ export const renderExportPdf = (res, { title, tree, wineFormat, priceFormat, men
                     ? formatTemplate(wineFormat, w)
                     : (w.vintage ? `${w.name} (${w.vintage})` : w.name);
 
+                const titleWidth = rightEdge - left - priceWidth - (priceWidth ? 10 : 0) - (iconOnRight ? iconReserve : 0);
+
                 doc.fillColor('#1a1a1a');
-                doc.text(titleText, left, startY, {
-                    width: rightEdge - left - priceWidth - (priceWidth ? 10 : 0),
-                });
+                doc.text(titleText, left, startY, { width: titleWidth });
                 const yAfterTitle = doc.y;
 
                 if (priceText) {
+                    const priceX = rightEdge - priceWidth - (iconOnRight ? iconReserve : 0);
                     doc.font(bodyFont).fontSize(bodySize).fillColor('#7B2D3A')
-                        .text(priceText, rightEdge - priceWidth, startY);
+                        .text(priceText, priceX, startY);
                 }
                 const yAfterPrice = doc.y;
+                const lineHeight = Math.max(yAfterTitle, yAfterPrice) - startY;
+
+                if (icon) {
+                    const iconX = iconOnLeft ? baseLeft : rightEdge - ICON_SIZE;
+                    drawIcon(doc, icon, iconX, startY, lineHeight);
+                }
 
                 doc.y = Math.max(yAfterTitle, yAfterPrice);
                 doc.moveDown(0.4);

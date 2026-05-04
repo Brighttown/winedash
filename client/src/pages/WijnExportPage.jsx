@@ -331,7 +331,7 @@ const SortableLevel = ({ groups, parentId, depth, onUpdate, onDelete, onAddChild
 
 // ────────────────────────────────────────────────────────────────────────────
 
-const PreviewTree = ({ tree, depth = 0, wineFormat, priceFormat }) => {
+const PreviewTree = ({ tree, depth = 0, wineFormat, priceFormat, iconAssignments, onToggleIcon, iconLookup }) => {
     if (!tree || tree.length === 0) return <p className="text-white/30 italic text-sm">Geen groepen.</p>;
     return (
         <div className="space-y-2">
@@ -345,9 +345,19 @@ const PreviewTree = ({ tree, depth = 0, wineFormat, priceFormat }) => {
                             {node.wines.map(w => {
                                 const customLine = wineFormat?.trim() ? formatTemplate(wineFormat, w) : null;
                                 const customPrice = priceFormat?.trim() ? formatTemplate(priceFormat, w) : null;
+                                const assignedIconId = iconAssignments?.[w.id];
+                                const assignedIcon = assignedIconId && iconLookup ? iconLookup[assignedIconId] : null;
                                 return (
-                                    <li key={w.id} className="flex justify-between gap-2 text-white/70">
-                                        <span className="truncate">
+                                    <li key={w.id} className="flex items-center gap-2 text-white/70">
+                                        <input type="checkbox"
+                                            checked={!!assignedIconId}
+                                            onChange={() => onToggleIcon?.(w.id)}
+                                            title="Icoon koppelen"
+                                            className="shrink-0 accent-[#7B2D3A]" />
+                                        {assignedIcon && (
+                                            <img src={assignedIcon.data_url} alt="" className="w-3.5 h-3.5 shrink-0" />
+                                        )}
+                                        <span className="truncate flex-1">
                                             {customLine || (
                                                 <>
                                                     {w.name}{w.vintage ? ` (${w.vintage})` : ''}
@@ -363,7 +373,7 @@ const PreviewTree = ({ tree, depth = 0, wineFormat, priceFormat }) => {
                             })}
                         </ul>
                     )}
-                    {node.children.length > 0 && <PreviewTree tree={node.children} depth={depth + 1} wineFormat={wineFormat} priceFormat={priceFormat} />}
+                    {node.children.length > 0 && <PreviewTree tree={node.children} depth={depth + 1} wineFormat={wineFormat} priceFormat={priceFormat} iconAssignments={iconAssignments} onToggleIcon={onToggleIcon} iconLookup={iconLookup} />}
                 </div>
             ))}
         </div>
@@ -383,10 +393,16 @@ const WijnExportPage = () => {
     ]);
     const [wineFormat, setWineFormat] = useState('[name] · [region] · [grape]');
     const [priceFormat, setPriceFormat] = useState('[sell_price] / [sell_price_glass]');
+    const [iconAssignments, setIconAssignments] = useState({}); // { [wineId]: iconId }
+    const [activeIconId, setActiveIconId] = useState('');
+    const [companyIcons, setCompanyIcons] = useState([]);
     const [previewTree, setPreviewTree] = useState(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
-    const structure = useMemo(() => ({ groups, wineFormat, priceFormat }), [groups, wineFormat, priceFormat]);
+    const structure = useMemo(
+        () => ({ groups, wineFormat, priceFormat, iconAssignments }),
+        [groups, wineFormat, priceFormat, iconAssignments]
+    );
 
     const fetchTemplates = useCallback(async () => {
         try {
@@ -396,6 +412,15 @@ const WijnExportPage = () => {
     }, []);
 
     useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
+
+    useEffect(() => {
+        api.get('/account/me').then(({ data }) => {
+            const list = data.company?.icons || [];
+            setCompanyIcons(list);
+            if (!activeIconId && list[0]) setActiveIconId(list[0].id);
+        }).catch(() => {});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const refreshPreview = useCallback(async () => {
         setPreviewLoading(true);
@@ -452,6 +477,7 @@ const WijnExportPage = () => {
             setGroups(data.structure?.groups || []);
             setWineFormat(data.structure?.wineFormat ?? '[name] · [region] · [grape]');
             setPriceFormat(data.structure?.priceFormat ?? '[sell_price] / [sell_price_glass]');
+            setIconAssignments(data.structure?.iconAssignments || {});
             toast.success('Template geladen');
         } catch { toast.error('Kan template niet laden'); }
     };
@@ -478,6 +504,17 @@ const WijnExportPage = () => {
         setGroups([newGroup('Rode wijnen')]);
         setWineFormat('[name] · [region] · [grape]');
         setPriceFormat('[sell_price] / [sell_price_glass]');
+        setIconAssignments({});
+    };
+
+    const toggleWineIcon = (wineId) => {
+        if (!activeIconId) return;
+        setIconAssignments(prev => {
+            const next = { ...prev };
+            if (next[wineId] === activeIconId) delete next[wineId];
+            else next[wineId] = activeIconId;
+            return next;
+        });
     };
 
     const deleteTemplate = async () => {
@@ -615,6 +652,38 @@ const WijnExportPage = () => {
                         Tokens worden bij export vervangen door wijnwaarden. Lege velden worden weggelaten — separator-tekens (-, /, |, *, ·) eromheen worden netjes opgeschoond.
                     </p>
                 </div>
+
+                <div className="md:col-span-2 pt-3 border-t border-white/10">
+                    <label className="text-xs font-bold uppercase tracking-wider text-white/40 mb-2 block">Icoon</label>
+                    {companyIcons.length === 0 ? (
+                        <p className="text-[11px] text-white/40">Nog geen iconen geüpload — voeg ze toe via <strong>Account → Wijnkaart-stijl</strong>.</p>
+                    ) : (
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <select
+                                value={activeIconId}
+                                onChange={e => setActiveIconId(e.target.value)}
+                                className="select-glass text-sm w-auto min-w-[160px]"
+                            >
+                                {companyIcons.map(ic => <option key={ic.id} value={ic.id}>{ic.name}</option>)}
+                            </select>
+                            {activeIconId && (() => {
+                                const ic = companyIcons.find(i => i.id === activeIconId);
+                                if (!ic) return null;
+                                return (
+                                    <div className="flex items-center gap-2 text-xs text-white/50">
+                                        <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center overflow-hidden">
+                                            <img src={ic.data_url} alt={ic.name} className="max-w-full max-h-full" />
+                                        </div>
+                                        <span>{ic.position?.h === 'right' ? 'Rechts' : 'Links'} · {({ top: 'Hoog', middle: 'Midden', bottom: 'Laag' })[ic.position?.v || 'middle']}</span>
+                                    </div>
+                                );
+                            })()}
+                            <span className="text-[11px] text-white/40 ml-auto">
+                                {Object.keys(iconAssignments).length} wijn{Object.keys(iconAssignments).length === 1 ? '' : 'en'} aangevinkt
+                            </span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -653,7 +722,14 @@ const WijnExportPage = () => {
                     {previewLoading && !previewTree ? (
                         <div className="text-center py-8"><div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto" /></div>
                     ) : (
-                        <PreviewTree tree={previewTree || []} wineFormat={wineFormat} priceFormat={priceFormat} />
+                        <PreviewTree
+                            tree={previewTree || []}
+                            wineFormat={wineFormat}
+                            priceFormat={priceFormat}
+                            iconAssignments={iconAssignments}
+                            onToggleIcon={toggleWineIcon}
+                            iconLookup={Object.fromEntries(companyIcons.map(i => [i.id, i]))}
+                        />
                     )}
                 </div>
             </div>

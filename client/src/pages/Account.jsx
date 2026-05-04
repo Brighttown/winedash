@@ -56,6 +56,9 @@ const Account = () => {
     const [menuStyle, setMenuStyle] = useState(DEFAULT_MENU_STYLE);
     const [savingMenuStyle, setSavingMenuStyle] = useState(false);
 
+    const [icons, setIcons] = useState([]);
+    const [savingIcons, setSavingIcons] = useState(false);
+
     const refresh = async () => {
         try {
             const [meRes, intRes] = await Promise.all([getMe(), listIntegrations()]);
@@ -73,6 +76,7 @@ const Account = () => {
                 heading: { ...DEFAULT_MENU_STYLE.heading, ...(ms.heading || {}) },
                 body:    { ...DEFAULT_MENU_STYLE.body,    ...(ms.body    || {}) },
             });
+            setIcons(meRes.company?.icons || []);
             setIntegrations(intRes);
         } catch (e) {
             toast.error('Kon account niet laden');
@@ -107,6 +111,50 @@ const Account = () => {
         } catch (e) {
             toast.error(e.response?.data?.error || 'Opslaan mislukt');
         } finally { setSavingCompany(false); }
+    };
+
+    const onUploadIcon = async (file) => {
+        if (!file) return;
+        if (file.size > 200_000) return toast.error('Bestand te groot (max 200KB)');
+        if (!/^image\/(svg\+xml|png|jpeg|jpg|gif)$/i.test(file.type)) {
+            return toast.error('Alleen SVG, PNG, JPG of GIF');
+        }
+        const reader = new FileReader();
+        reader.onload = async () => {
+            const newIcons = [...icons, {
+                id: Math.random().toString(36).slice(2, 11),
+                name: file.name.replace(/\.[^.]+$/, '').slice(0, 60) || 'icoon',
+                mime: file.type,
+                data_url: reader.result,
+                position: { h: 'left', v: 'middle' },
+            }];
+            setIcons(newIcons);
+            await persistIcons(newIcons);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const persistIcons = async (next) => {
+        setSavingIcons(true);
+        try {
+            const c = await updateCompany({ icons: next });
+            setCompany(c);
+        } catch (e) {
+            toast.error(e.response?.data?.error || 'Iconen opslaan mislukt');
+        } finally { setSavingIcons(false); }
+    };
+
+    const updateIcon = (id, patch) => {
+        const next = icons.map(i => i.id === id ? { ...i, ...patch, position: { ...i.position, ...(patch.position || {}) } } : i);
+        setIcons(next);
+        persistIcons(next);
+    };
+
+    const removeIcon = (id) => {
+        if (!window.confirm('Icoon verwijderen?')) return;
+        const next = icons.filter(i => i.id !== id);
+        setIcons(next);
+        persistIcons(next);
     };
 
     const onSaveMenuStyle = async (e) => {
@@ -306,6 +354,63 @@ const Account = () => {
                         </button>
                     </div>
                 </form>
+
+                {/* Icon library */}
+                <div className="mt-6 pt-6 border-t border-white/10">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <p className="text-sm font-bold text-white">Iconen</p>
+                            <p className="text-xs text-white/50">SVG of PNG om naast wijnen te plaatsen (max 200KB).</p>
+                        </div>
+                        <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold cursor-pointer flex items-center gap-2">
+                            <Plus size={14} /> {savingIcons ? 'Bezig…' : 'Upload'}
+                            <input type="file" accept="image/svg+xml,image/png,image/jpeg,image/gif"
+                                className="hidden"
+                                onChange={e => { onUploadIcon(e.target.files?.[0]); e.target.value = ''; }} />
+                        </label>
+                    </div>
+
+                    {icons.length === 0 ? (
+                        <p className="text-center py-6 text-white/30 text-sm border border-dashed border-white/10 rounded-xl">
+                            Nog geen iconen toegevoegd.
+                        </p>
+                    ) : (
+                        <div className="grid sm:grid-cols-2 gap-3">
+                            {icons.map(icon => (
+                                <div key={icon.id} className="glass-sm rounded-xl p-3 flex items-start gap-3">
+                                    <div className="w-12 h-12 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center shrink-0 overflow-hidden">
+                                        <img src={icon.data_url} alt={icon.name} className="max-w-full max-h-full" />
+                                    </div>
+                                    <div className="flex-1 min-w-0 space-y-2">
+                                        <input className="input-glass text-sm py-1.5"
+                                            value={icon.name}
+                                            onChange={e => setIcons(s => s.map(i => i.id === icon.id ? { ...i, name: e.target.value } : i))}
+                                            onBlur={() => updateIcon(icon.id, { name: icons.find(i => i.id === icon.id).name })} />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <select className="select-glass text-xs py-1"
+                                                value={icon.position?.h || 'left'}
+                                                onChange={e => updateIcon(icon.id, { position: { h: e.target.value } })}>
+                                                <option value="left">Links</option>
+                                                <option value="right">Rechts</option>
+                                            </select>
+                                            <select className="select-glass text-xs py-1"
+                                                value={icon.position?.v || 'middle'}
+                                                onChange={e => updateIcon(icon.id, { position: { v: e.target.value } })}>
+                                                <option value="top">Hoog</option>
+                                                <option value="middle">Midden</option>
+                                                <option value="bottom">Laag</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => removeIcon(icon.id)}
+                                        className="text-white/40 hover:text-red-400 p-1 rounded">
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </Section>
 
             {/* Kassakoppelingen */}
