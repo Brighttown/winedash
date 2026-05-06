@@ -348,14 +348,41 @@ const SortableLevel = ({ groups, parentId, depth, onUpdate, onDelete, onAddChild
 
 // ────────────────────────────────────────────────────────────────────────────
 
+// Roteerbaar palet per nesting-niveau zodat sub-groepen herkenbaar zijn.
+const DEPTH_PALETTE = [
+    { accent: '#C4758A', tint: 'rgba(196,117,138,0.10)', text: 'text-white' },     // 0 — wijnrood
+    { accent: '#7CB6E8', tint: 'rgba(124,182,232,0.08)', text: 'text-white/95' },  // 1 — blauw
+    { accent: '#9DD482', tint: 'rgba(157,212,130,0.08)', text: 'text-white/90' },  // 2 — groen
+    { accent: '#F2C16B', tint: 'rgba(242,193,107,0.08)', text: 'text-white/85' },  // 3 — oker
+    { accent: '#C9A0E0', tint: 'rgba(201,160,224,0.08)', text: 'text-white/85' },  // 4 — paars
+];
+
 const PreviewTree = ({ tree, depth = 0, wineFormat, priceFormat, iconAssignments, onToggleIcon, iconLookup }) => {
     if (!tree || tree.length === 0) return <p className="text-white/30 italic text-sm">Geen groepen.</p>;
     return (
-        <div className="space-y-2">
-            {tree.map(node => (
-                <div key={node.id} style={{ marginLeft: depth * 12 }}>
-                    <p className="font-bold text-white text-sm border-b border-white/10 pb-1 mb-1">
-                        {node.name} <span className="text-white/30 font-normal text-xs">· {node.wines.length}</span>
+        <div className={depth === 0 ? 'space-y-3' : 'space-y-2'}>
+            {tree.map(node => {
+                const palette = DEPTH_PALETTE[Math.min(depth, DEPTH_PALETTE.length - 1)];
+                const headingSize = depth === 0 ? 'text-sm' : depth === 1 ? 'text-[13px]' : 'text-xs';
+                return (
+                <div
+                    key={node.id}
+                    className="rounded-lg pl-3 pr-2 py-1.5"
+                    style={{
+                        marginLeft: depth === 0 ? 0 : 8,
+                        borderLeft: `3px solid ${palette.accent}`,
+                        background: palette.tint,
+                    }}
+                >
+                    <p className={`font-bold ${palette.text} ${headingSize} flex items-center gap-2 mb-1`}>
+                        <span className="uppercase tracking-wider" style={{ color: palette.accent, fontSize: '10px', fontWeight: 700 }}>
+                            {'•'.repeat(depth + 1)}
+                        </span>
+                        <span className="truncate">{node.name}</span>
+                        <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                            style={{ background: palette.tint, color: palette.accent, border: `1px solid ${palette.accent}40` }}>
+                            {node.wines.length} wijn{node.wines.length === 1 ? '' : 'en'}
+                        </span>
                     </p>
                     {node.wines.length > 0 && (
                         <ul className="space-y-0.5 text-xs">
@@ -390,9 +417,14 @@ const PreviewTree = ({ tree, depth = 0, wineFormat, priceFormat, iconAssignments
                             })}
                         </ul>
                     )}
-                    {node.children.length > 0 && <PreviewTree tree={node.children} depth={depth + 1} wineFormat={wineFormat} priceFormat={priceFormat} iconAssignments={iconAssignments} onToggleIcon={onToggleIcon} iconLookup={iconLookup} />}
+                    {node.children.length > 0 && (
+                        <div className="mt-2">
+                            <PreviewTree tree={node.children} depth={depth + 1} wineFormat={wineFormat} priceFormat={priceFormat} iconAssignments={iconAssignments} onToggleIcon={onToggleIcon} iconLookup={iconLookup} />
+                        </div>
+                    )}
                 </div>
-            ))}
+                );
+            })}
         </div>
     );
 };
