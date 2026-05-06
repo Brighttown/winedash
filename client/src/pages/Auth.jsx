@@ -18,6 +18,16 @@ const Auth = () => {
             const { data } = await api.post(endpoint, formData);
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
+            if (window.PasswordCredential) {
+                try {
+                    const cred = new window.PasswordCredential({
+                        id: formData.username,
+                        password: formData.password,
+                        name: formData.username,
+                    });
+                    await navigator.credentials.store(cred);
+                } catch (_) { /* browser kan opslaan weigeren; negeer */ }
+            }
             toast.success(isLogin ? 'Welkom terug!' : 'Account succesvol aangemaakt!');
             navigate('/');
         } catch (err) {
@@ -90,7 +100,7 @@ const Auth = () => {
 
                         <div className="relative">
                             <Lock className="absolute top-3 left-3 text-white/40" size={20} />
-                            <input required type="password" name="password" placeholder="Wachtwoord" value={formData.password} onChange={handleChange} className={inputClass} autoComplete="current-password" />
+                            <input required type="password" name="password" placeholder="Wachtwoord" value={formData.password} onChange={handleChange} className={inputClass} autoComplete={isLogin ? "current-password" : "new-password"} />
                         </div>
 
                         <button
